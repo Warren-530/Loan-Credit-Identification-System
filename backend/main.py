@@ -1,0 +1,1401 @@
+"""
+FastAPI Backend for TrustLens AI
+"""
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import Optional, List
+import os
+import shutil
+from datetime import datetime
+from pathlib import Path
+import asyncio
+from dotenv import load_dotenv
+
+from models import Application, ApplicationStatus, LoanType, RiskLevel, ReviewStatus, AnalysisCache
+from database import init_db, get_session
+from pdf_processor import PDFProcessor, TextProcessor
+from ai_engine import AIEngine
+from config import Config, RiskConfig, LoanConfig, AIConfig
+
+# Load environment variables
+load_dotenv()
+
+# Initialize FastAPI app
+app = FastAPI(title="TrustLens AI API", version="1.0.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=Config().CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create upload directory
+UPLOAD_DIR = Path(Config().UPLOAD_DIR)
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Initialize AI Engine
+GEMINI_API_KEY = os.getenv(AIConfig.GEMINI_API_KEY_ENV)
+if not GEMINI_API_KEY:
+    print("WARNING: GEMINI_API_KEY not set. AI analysis will fail.")
+    ai_engine = None
+else:
+    ai_engine = AIEngine(GEMINI_API_KEY)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    init_db()
+    print("✓ Database initialized")
+    # Mount static uploads if not already
+    if "uploads" not in [r.path for r in app.routes]:
+        app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"status": "ok", "service": "TrustLens AI API"}
+
+
+@app.get("/api/applications")
+async def get_applications(limit: int = 50):
+    """Get all applications"""
+    with get_session() as session:
+        applications = session.query(Application).order_by(Application.created_at.desc()).limit(limit).all()
+        return [
+            {
+                "id": app.application_id,
+                "name": app.applicant_name,
+                "type": app.loan_type,
+                "amount": f"RM {app.requested_amount:,.0f}",
+                "score": app.risk_score or 0,
+                "status": app.final_decision if app.status == ApplicationStatus.APPROVED else app.status,
+                "date": app.created_at.isoformat(),
+                "review_status": app.review_status,
+                "ai_decision": app.ai_decision,
+                "human_decision": app.human_decision,
+            }
+            for app in applications
+        ]
+
+
+@app.get("/api/application/{application_id}")
+async def get_application(application_id: str):
+    """Get specific application details"""
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        # Build file URLs for static access (PDF/Text originals)
+        def build_file_url(path: Optional[str]) -> Optional[str]:
+            if not path:
+                return None
+            try:
+                p = Path(path)
+                # Find 'uploads' segment and build a relative path under it
+                parts = list(p.parts)
+                if 'uploads' in parts:
+                    start_idx = parts.index('uploads') + 1
+                    relative_parts = parts[start_idx:]
+                else:
+                    # If path already relative, just use its name and parents
+                    # Ensure we never expose absolute drive letters
+                    relative_parts = parts[-2:] if len(parts) >= 2 else parts
+                relative_posix = "/".join(relative_parts)
+                return f"/uploads/{relative_posix}" if relative_posix else None
+            except Exception:
+                return None
+        bank_url = build_file_url(app.bank_statement_path)
+        essay_url = build_file_url(app.essay_path)
+        payslip_url = build_file_url(app.payslip_path)
+
+        # File metadata helper
+        import mimetypes
+        def meta(path: Optional[str]):
+            if not path or not os.path.exists(path):
+                return None
+            size = os.path.getsize(path)
+            mime, _ = mimetypes.guess_type(path)
+            return {"filename": os.path.basename(path), "size_bytes": size, "mime_type": mime or "application/octet-stream"}
+        file_metadata = {
+            "bank_statement": meta(app.bank_statement_path),
+            "loan_essay": meta(app.essay_path),
+            "payslip": meta(app.payslip_path)
+        }
+        
+        return {
+            "id": app.application_id,
+            "name": app.applicant_name,
+            "ic": app.applicant_ic,
+            "loan_type": app.loan_type.value if hasattr(app.loan_type, 'value') else app.loan_type,
+            "requested_amount": app.requested_amount,
+            "status": app.status.value if app.status else None,
+            "risk_score": app.risk_score,
+            "risk_level": app.risk_level.value if app.risk_level else None,
+            "final_decision": app.final_decision,
+            "created_at": app.created_at.isoformat(),
+            "analysis_result": app.analysis_result,
+            "document_texts": app.analysis_result.get("document_texts") if app.analysis_result else None,
+            "review_status": app.review_status.value if app.review_status else None,
+            "ai_decision": app.ai_decision,
+            "human_decision": app.human_decision,
+            "reviewed_by": app.reviewed_by,
+            "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
+            "override_reason": app.override_reason,
+            "decision_history": app.decision_history or [],
+            "bank_statement_url": bank_url,
+            "essay_url": essay_url,
+            "payslip_url": payslip_url,
+            "file_metadata": file_metadata,
+        }
+
+
+@app.get("/api/status/{application_id}")
+async def get_status(application_id: str):
+    """Lightweight status endpoint for polling"""
+    with get_session() as session:
+        app_obj = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app_obj:
+            raise HTTPException(status_code=404, detail="Application not found")
+        return {
+            "application_id": app_obj.application_id,
+            "status": app_obj.status.value if app_obj.status else None,
+            "risk_score": app_obj.risk_score or 0,
+            "risk_level": app_obj.risk_level.value if app_obj.risk_level else None,
+            "final_decision": app_obj.final_decision or app_obj.ai_decision or "Pending",
+            "review_status": app_obj.review_status.value if app_obj.review_status else None,
+        }
+
+
+async def process_application_background(
+    application_id: str,
+    loan_type: str,
+    bank_statement_path: str,
+    essay_path: Optional[str] = None,
+    payslip_path: Optional[str] = None
+):
+    """Background task to process application with AI (now includes payslip)."""
+    print(f"\n{'='*60}")
+    print(f"Starting analysis for {application_id}")
+    print(f"Loan Type: {loan_type}")
+    print(f"Bank Statement: {bank_statement_path}")
+    print(f"Essay: {essay_path}")
+    print(f"Payslip: {payslip_path}")
+    print(f"{'='*60}\n")
+
+    try:
+        with get_session() as session:
+            app = session.query(Application).filter(Application.application_id == application_id).first()
+            if not app:
+                print(f"ERROR: Application {application_id} not found in database!")
+                return
+            # Cache any attributes we will need after the session closes to avoid DetachedInstanceError
+            requested_amount_cached = app.requested_amount
+            app.status = ApplicationStatus.ANALYZING
+            session.add(app)
+            session.commit()
+            print("✓ Status updated to ANALYZING")
+
+        await asyncio.sleep(2)
+
+        pdf_processor = PDFProcessor()
+        text_processor = TextProcessor()
+
+        raw_text = ""
+        bank_text = ""
+        essay_text = ""
+        payslip_text = ""
+
+        # Bank Statement
+        if bank_statement_path:
+            try:
+                print(f"Extracting bank statement from: {bank_statement_path}")
+                bank_text = pdf_processor.extract_text(bank_statement_path) if bank_statement_path.endswith('.pdf') else text_processor.extract_text(bank_statement_path)
+                raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
+                print(f"✓ Bank statement extracted: {len(bank_text)} characters")
+            except Exception as e:
+                print(f"⚠ Error extracting bank statement: {e}")
+                bank_text = "Bank statement extraction failed"
+                raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
+
+        # Essay
+        if essay_path:
+            try:
+                print(f"Extracting essay from: {essay_path}")
+                essay_text = pdf_processor.extract_text(essay_path) if essay_path.endswith('.pdf') else text_processor.extract_text(essay_path)
+                raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
+                print(f"✓ Essay extracted: {len(essay_text)} characters")
+            except Exception as e:
+                print(f"⚠ Error extracting essay: {e}")
+                essay_text = "Essay extraction failed"
+                raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
+
+        # Payslip
+        if payslip_path:
+            try:
+                print(f"Extracting payslip from: {payslip_path}")
+                payslip_text = pdf_processor.extract_text(payslip_path) if payslip_path.endswith('.pdf') else text_processor.extract_text(payslip_path)
+                raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
+                print(f"✓ Payslip extracted: {len(payslip_text)} characters")
+            except Exception as e:
+                print(f"⚠ Error extracting payslip: {e}")
+                payslip_text = "Payslip extraction failed"
+                raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
+
+        print(f"\nTotal raw text length: {len(raw_text)} characters")
+
+        result = None
+        with get_session() as session:
+            cached = session.query(AnalysisCache).filter(AnalysisCache.application_id == application_id).first()
+            if cached:
+                print("✓ Using cached result")
+                result = cached.result_json
+            elif ai_engine:
+                try:
+                    print("⚡ Running AI analysis with Gemini...")
+                    result = ai_engine.analyze_application(loan_type, raw_text, bank_text, essay_text, payslip_text, application_id)
+                    print("✓ AI analysis completed (Gemini)")
+                    cache = AnalysisCache(application_id=application_id, result_json=result)
+                    session.add(cache)
+                    session.commit()
+                    print("✓ Result cached")
+                except Exception as e:
+                    print(f"⚠ AI analysis failed: {e}")
+                    print("🔄 Falling back to document-based analysis...")
+                    result = generate_mock_result(loan_type, raw_text, application_id, requested_amount_cached, bank_text, essay_text, payslip_text)
+                    print("✓ Fallback analysis completed")
+            else:
+                print("ℹ No Gemini API key configured")
+                print("🔄 Using document-based analysis...")
+                result = generate_mock_result(loan_type, raw_text, application_id, requested_amount_cached, bank_text, essay_text, payslip_text)
+                print("✓ Document-based analysis completed")
+
+        if not result:
+            raise Exception("No analysis result generated!")
+
+        print("\nAnalysis Result:")
+        print(f"  Risk Score: {result.get('risk_score')}")
+        print(f"  Risk Level: {result.get('risk_level')}")
+        print(f"  Decision: {result.get('final_decision')}")
+
+        with get_session() as session:
+            app = session.query(Application).filter(Application.application_id == application_id).first()
+            if app:
+                # Map final decision directly to status for user clarity
+                decision = result.get("final_decision", "Review Required")
+                status_map = {
+                    "Approved": ApplicationStatus.APPROVED,
+                    "Rejected": ApplicationStatus.REJECTED,
+                    "Review Required": ApplicationStatus.REVIEW_REQUIRED
+                }
+                app.status = status_map.get(decision, ApplicationStatus.REVIEW_REQUIRED)
+                app.risk_score = result.get("risk_score", 50)
+                rl_val = result.get("risk_level", "Medium") or "Medium"
+                if rl_val not in RiskLevel._value2member_map_:
+                    print(f"[WARN] Unknown risk_level '{rl_val}' in result. Falling back to 'Medium'. Keys: {list(result.keys())}")
+                    rl_val = "Medium"
+                app.risk_level = RiskLevel(rl_val)
+                app.final_decision = result.get("final_decision", "Review Required")
+                app.ai_decision = result.get("final_decision", "Review Required")
+                app.analysis_result = result
+                app.updated_at = datetime.utcnow()
+                app.decision_history = [{
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "actor": "AI System",
+                    "action": f"Recommended '{app.final_decision}'",
+                    "details": f"Risk Score: {app.risk_score}",
+                    "reason": None
+                }]
+                session.add(app)
+                session.commit()
+                print(f"\n✅ Application {application_id} analysis finished")
+                print(f"   Status: {app.status.value} | Score: {app.risk_score}")
+                print(f"{'='*60}\n")
+
+    except Exception as e:
+        import traceback
+        print("\n❌ CRITICAL ERROR in background processing:")
+        print(f"Error: {e}")
+        print(f"Traceback:\n{traceback.format_exc()}")
+        print(f"{'='*60}\n")
+        with get_session() as session:
+            app = session.query(Application).filter(Application.application_id == application_id).first()
+            if app:
+                app.status = ApplicationStatus.FAILED
+                session.add(app)
+                session.commit()
+                print(f"Set application {application_id} status to FAILED")
+
+
+@app.post("/api/upload")
+async def upload_application(
+    background_tasks: BackgroundTasks,
+    loan_type: str = Form(...),
+    ic_number: str = Form(...),
+    applicant_name: str = Form(default="Unknown Applicant"),
+    requested_amount: float = Form(default=50000),
+    bank_statement: UploadFile = File(...),
+    essay: Optional[UploadFile] = File(None),
+    payslip: Optional[UploadFile] = File(None),
+    supporting_docs: Optional[UploadFile] = File(None),
+):
+    """Upload new loan application"""
+    try:
+        # Generate application ID
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        application_id = f"APP-{timestamp}"
+        
+        # Create application folder
+        app_folder = UPLOAD_DIR / application_id
+        app_folder.mkdir(exist_ok=True)
+        
+        # Save bank statement
+        bank_statement_path = app_folder / bank_statement.filename
+        with open(bank_statement_path, "wb") as buffer:
+            shutil.copyfileobj(bank_statement.file, buffer)
+        
+        # Save essay if provided
+        essay_path = None
+        if essay:
+            essay_path = app_folder / essay.filename
+            with open(essay_path, "wb") as buffer:
+                shutil.copyfileobj(essay.file, buffer)
+
+        # Save payslip if provided
+        payslip_path = None
+        if payslip:
+            payslip_path = app_folder / payslip.filename
+            with open(payslip_path, "wb") as buffer:
+                shutil.copyfileobj(payslip.file, buffer)
+        
+        # Create application record
+        # Normalize loan type codes (support both descriptive & shorthand)
+        LT_MAP = {
+            "MICRO_BUSINESS": LoanType.MICRO_BUSINESS.value,
+            "PERSONAL": LoanType.PERSONAL.value,
+            "HOUSING": LoanType.HOUSING.value,
+            "CAR": LoanType.CAR.value,
+        }
+        normalized_loan_type = LT_MAP.get(loan_type, loan_type)
+
+        with get_session() as session:
+            app = Application(
+                application_id=application_id,
+                applicant_name=applicant_name,
+                applicant_ic=ic_number,
+                loan_type=LoanType(normalized_loan_type),
+                requested_amount=requested_amount,
+                status=ApplicationStatus.PROCESSING,
+                bank_statement_path=str(bank_statement_path),
+                essay_path=str(essay_path) if essay_path else None,
+                payslip_path=str(payslip_path) if payslip_path else None,
+            )
+            session.add(app)
+            session.commit()
+        
+        # Add background task for AI processing
+        background_tasks.add_task(
+            process_application_background,
+            application_id,
+            loan_type,
+            str(bank_statement_path),
+            str(essay_path) if essay_path else None,
+            str(payslip_path) if payslip_path else None
+        )
+        
+        return {
+            "success": True,
+            "application_id": application_id,
+            "message": "Application submitted for analysis"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/upload/batch")
+async def upload_batch(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    """Upload batch applications via CSV or ZIP"""
+    try:
+        # Save uploaded file
+        batch_path = UPLOAD_DIR / f"batch_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+        with open(batch_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        processed_count = 0
+        
+        # Handle CSV files
+        if file.filename.endswith('.csv'):
+            import csv
+            with open(batch_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    # Expected columns: loan_type, ic_number, applicant_name, requested_amount, bank_statement_path, essay_path
+                    timestamp = datetime.now().strftime("%Y%m%d%H%M%S") + str(processed_count)
+                    app_id = f"APP-{timestamp}"
+                    
+                    with get_session() as session:
+                        app = Application(
+                            application_id=app_id,
+                            applicant_name=row.get('applicant_name', 'Batch Upload'),
+                            applicant_ic=row.get('ic_number', 'N/A'),
+                            loan_type=LoanType(row.get('loan_type', 'Personal Loan')),
+                            requested_amount=float(row.get('requested_amount', 50000)),
+                            status=ApplicationStatus.PROCESSING,
+                            bank_statement_path=row.get('bank_statement_path'),
+                            essay_path=row.get('essay_path'),
+                        )
+                        session.add(app)
+                        session.commit()
+                    
+                    # Add background processing
+                    background_tasks.add_task(
+                        process_application_background,
+                        app_id,
+                        row.get('loan_type', 'Personal Loan'),
+                        row.get('bank_statement_path'),
+                        row.get('essay_path')
+                    )
+                    processed_count += 1
+        
+        # Handle ZIP files
+        elif file.filename.endswith('.zip'):
+            import zipfile
+            with zipfile.ZipFile(batch_path, 'r') as zip_ref:
+                extract_path = UPLOAD_DIR / f"extracted_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                extract_path.mkdir(exist_ok=True)
+                zip_ref.extractall(extract_path)
+                
+                # Look for CSV manifest or process individual PDFs
+                csv_files = list(extract_path.glob('*.csv'))
+                if csv_files:
+                    # Process CSV manifest
+                    import csv
+                    with open(csv_files[0], 'r', encoding='utf-8') as csvfile:
+                        reader = csv.DictReader(csvfile)
+                        for row in reader:
+                            timestamp = datetime.now().strftime("%Y%m%d%H%M%S") + str(processed_count)
+                            app_id = f"APP-{timestamp}"
+                            
+                            # Resolve file paths relative to extract_path
+                            bank_path = extract_path / row.get('bank_statement_path', '')
+                            essay_path = extract_path / row.get('essay_path', '') if row.get('essay_path') else None
+                            
+                            with get_session() as session:
+                                app = Application(
+                                    application_id=app_id,
+                                    applicant_name=row.get('applicant_name', 'Batch Upload'),
+                                    applicant_ic=row.get('ic_number', 'N/A'),
+                                    loan_type=LoanType(row.get('loan_type', 'Personal Loan')),
+                                    requested_amount=float(row.get('requested_amount', 50000)),
+                                    status=ApplicationStatus.PROCESSING,
+                                    bank_statement_path=str(bank_path) if bank_path.exists() else None,
+                                    essay_path=str(essay_path) if essay_path and essay_path.exists() else None,
+                                )
+                                session.add(app)
+                                session.commit()
+                            
+                            background_tasks.add_task(
+                                process_application_background,
+                                app_id,
+                                row.get('loan_type', 'Personal Loan'),
+                                str(bank_path) if bank_path.exists() else None,
+                                str(essay_path) if essay_path and essay_path.exists() else None
+                            )
+                            processed_count += 1
+        
+        return {
+            "success": True,
+            "processed_count": processed_count,
+            "message": f"Batch upload successful: {processed_count} applications queued"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch upload failed: {str(e)}")
+
+
+## Duplicate status endpoint removed (using the lightweight polling version above)
+
+
+@app.post("/api/application/{application_id}/verify")
+async def verify_application(
+    application_id: str,
+    decision: str,
+    reviewer_name: str = Config().DEFAULT_REVIEWER,
+    override_reason: Optional[str] = None
+):
+    """Human verification/override of AI decision"""
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Determine if this is an override
+        is_override = app.ai_decision and decision != app.ai_decision
+        
+        # Update verification fields
+        app.human_decision = decision
+        app.final_decision = decision
+        app.reviewed_by = reviewer_name
+        app.reviewed_at = datetime.utcnow()
+        app.review_status = ReviewStatus.MANUAL_OVERRIDE if is_override else ReviewStatus.HUMAN_VERIFIED
+        
+        if is_override and override_reason:
+            app.override_reason = override_reason
+        
+        # Add to decision history
+        if not app.decision_history:
+            app.decision_history = []
+        
+        app.decision_history.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "actor": reviewer_name,
+            "action": f"Changed decision to '{decision}'",
+            "details": f"Override" if is_override else "Verified AI decision",
+            "reason": override_reason
+        })
+        
+        app.updated_at = datetime.utcnow()
+        session.add(app)
+        session.commit()
+        
+        return {
+            "success": True,
+            "review_status": app.review_status,
+            "is_override": is_override
+        }
+
+
+@app.get("/api/application/{application_id}/navigate")
+async def navigate_application(application_id: str, direction: str = "next"):
+    """Get previous or next application ID for navigation"""
+    with get_session() as session:
+        current_app = session.query(Application).filter(Application.application_id == application_id).first()
+        
+        if not current_app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        if direction == "next":
+            next_app = session.query(Application).filter(
+                Application.created_at < current_app.created_at
+            ).order_by(Application.created_at.desc()).first()
+            
+            if next_app:
+                return {"application_id": next_app.application_id}
+        else:  # previous
+            prev_app = session.query(Application).filter(
+                Application.created_at > current_app.created_at
+            ).order_by(Application.created_at.asc()).first()
+            
+            if prev_app:
+                return {"application_id": prev_app.application_id}
+        
+        return {"application_id": None}
+
+
+@app.get("/api/applications/stats")
+async def get_application_stats():
+    """Get current position stats for navigation"""
+    with get_session() as session:
+        total = session.query(Application).count()
+        return {"total": total}
+
+
+
+
+
+
+# === LOAN-SPECIFIC SCORING FUNCTIONS ===
+
+def calculate_business_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, breakdown):
+    """Micro-Business Loan specific scoring - focuses on business viability and cash flow"""
+    
+    # Business Experience & Planning
+    business_keywords = ['business', 'expand', 'capital', 'equipment', 'inventory', 'customers', 'revenue', 'profit', 'sales']
+    business_score = sum(1 for keyword in business_keywords if keyword in essay_text.lower())
+    if business_score >= 5:
+        base_score += 15
+        breakdown.append({"category": "Strong Business Plan", "points": 15, "reason": f"Comprehensive business planning with {business_score} key indicators", "type": "positive"})
+    elif business_score >= 3:
+        base_score += 8
+        breakdown.append({"category": "Basic Business Plan", "points": 8, "reason": f"Basic business planning with {business_score} indicators", "type": "neutral"})
+    
+    # Cash Flow Analysis 
+    cash_flow_keywords = ['monthly income', 'revenue', 'sales', 'receipts', 'cash flow', 'profit']
+    cash_indicators = sum(1 for keyword in cash_flow_keywords if keyword in bank_text.lower())
+    if cash_indicators >= 3:
+        base_score += 12
+        breakdown.append({"category": "Healthy Business Cash Flow", "points": 12, "reason": f"Strong cash flow patterns with {cash_indicators} indicators", "type": "positive"})
+    
+    # Business Debt Service Ability
+    if requested_amount > 0:
+        estimated_monthly_revenue = extract_income_from_text(bank_text, payslip_text)
+        if estimated_monthly_revenue > 0:
+            debt_service_ratio = (requested_amount * 0.1) / estimated_monthly_revenue  # Assume 10% interest
+            if debt_service_ratio < 0.3:
+                base_score += 10
+                breakdown.append({"category": "Excellent Debt Service Ratio", "points": 10, "reason": f"Low debt service burden ({debt_service_ratio:.1%})", "type": "positive"})
+            elif debt_service_ratio > 0.5:
+                base_score -= 12
+                breakdown.append({"category": "High Debt Service Risk", "points": -12, "reason": f"High debt service burden ({debt_service_ratio:.1%})", "type": "negative"})
+    
+    # Business Registration & Legitimacy
+    business_legitimacy = ['license', 'registration', 'permit', 'ssm', 'tax', 'gst']
+    legitimacy_score = sum(1 for keyword in business_legitimacy if keyword in text_lower)
+    if legitimacy_score >= 2:
+        base_score += 8
+        breakdown.append({"category": "Business Legitimacy", "points": 8, "reason": "Evidence of proper business registration/licensing", "type": "positive"})
+    
+    return base_score
+
+def calculate_personal_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, breakdown):
+    """Personal Loan specific scoring - focuses on income stability and personal finance management"""
+    
+    # Income Stability
+    income_keywords = ['salary', 'wages', 'employment', 'job', 'work', 'employer', 'monthly income']
+    income_indicators = sum(1 for keyword in income_keywords if keyword in payslip_text.lower())
+    if income_indicators >= 4:
+        base_score += 15
+        breakdown.append({"category": "Stable Employment Income", "points": 15, "reason": f"Strong employment indicators with {income_indicators} factors", "type": "positive"})
+    elif income_indicators >= 2:
+        base_score += 8
+        breakdown.append({"category": "Basic Employment Evidence", "points": 8, "reason": f"Basic employment evidence with {income_indicators} indicators", "type": "neutral"})
+    
+    # Personal Financial Management
+    savings_keywords = ['savings', 'fixed deposit', 'asb', 'tabung haji', 'investment', 'epf']
+    savings_indicators = sum(1 for keyword in savings_keywords if keyword in bank_text.lower())
+    if savings_indicators >= 2:
+        base_score += 12
+        breakdown.append({"category": "Good Savings Habits", "points": 12, "reason": f"Evidence of savings/investment discipline", "type": "positive"})
+    
+    # Personal Loan Purpose
+    purpose_keywords = ['emergency', 'medical', 'education', 'home improvement', 'consolidation']
+    purpose_clarity = sum(1 for keyword in purpose_keywords if keyword in essay_text.lower())
+    if purpose_clarity >= 1:
+        base_score += 6
+        breakdown.append({"category": "Clear Personal Purpose", "points": 6, "reason": "Valid personal loan purpose identified", "type": "positive"})
+    
+    # Personal Debt-to-Income Analysis
+    if requested_amount > 0:
+        monthly_income = extract_income_from_text(bank_text, payslip_text)
+        if monthly_income > 0:
+            monthly_payment = requested_amount / 60  # Assume 5-year term
+            dti_ratio = monthly_payment / monthly_income
+            if dti_ratio < 0.2:
+                base_score += 10
+                breakdown.append({"category": "Low Personal DTI Ratio", "points": 10, "reason": f"Manageable debt-to-income ratio ({dti_ratio:.1%})", "type": "positive"})
+            elif dti_ratio > 0.4:
+                base_score -= 15
+                breakdown.append({"category": "High Personal DTI Risk", "points": -15, "reason": f"High debt-to-income ratio ({dti_ratio:.1%})", "type": "negative"})
+    
+    return base_score
+
+def calculate_car_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, breakdown):
+    """Car Loan specific scoring - focuses on asset value and transportation need"""
+    
+    # Vehicle Purpose & Need
+    vehicle_keywords = ['transport', 'work', 'family', 'commute', 'business use', 'delivery', 'car', 'vehicle']
+    vehicle_need = sum(1 for keyword in vehicle_keywords if keyword in essay_text.lower())
+    if vehicle_need >= 3:
+        base_score += 10
+        breakdown.append({"category": "Clear Vehicle Need", "points": 10, "reason": f"Strong justification for vehicle with {vehicle_need} factors", "type": "positive"})
+    
+    # Asset Value vs Loan Amount
+    if requested_amount > 0:
+        if requested_amount <= 50000:  # Reasonable car price
+            base_score += 8
+            breakdown.append({"category": "Reasonable Vehicle Price", "points": 8, "reason": f"Moderate loan amount (RM {requested_amount:,.0f})", "type": "positive"})
+        elif requested_amount > 100000:  # Luxury car
+            base_score -= 5
+            breakdown.append({"category": "High-End Vehicle", "points": -5, "reason": f"Expensive vehicle (RM {requested_amount:,.0f})", "type": "neutral"})
+    
+    # Down Payment Capability
+    deposit_keywords = ['down payment', 'deposit', 'advance payment', 'initial payment']
+    deposit_evidence = sum(1 for keyword in deposit_keywords if keyword in text_lower)
+    if deposit_evidence >= 1:
+        base_score += 7
+        breakdown.append({"category": "Down Payment Evidence", "points": 7, "reason": "Evidence of down payment capability", "type": "positive"})
+    
+    # Vehicle Insurance & Maintenance Consideration
+    insurance_keywords = ['insurance', 'road tax', 'maintenance', 'servicing']
+    maintenance_awareness = sum(1 for keyword in insurance_keywords if keyword in text_lower)
+    if maintenance_awareness >= 2:
+        base_score += 5
+        breakdown.append({"category": "Maintenance Awareness", "points": 5, "reason": "Understanding of vehicle ownership costs", "type": "positive"})
+    
+    # Car Loan Income Verification
+    monthly_income = extract_income_from_text(bank_text, payslip_text)
+    if monthly_income > 0 and requested_amount > 0:
+        car_affordability = (requested_amount / 84) / monthly_income  # 7-year term
+        if car_affordability < 0.3:
+            base_score += 12
+            breakdown.append({"category": "Excellent Car Affordability", "points": 12, "reason": f"Vehicle easily affordable ({car_affordability:.1%} of income)", "type": "positive"})
+        elif car_affordability > 0.5:
+            base_score -= 10
+            breakdown.append({"category": "Vehicle Affordability Concern", "points": -10, "reason": f"High vehicle cost ratio ({car_affordability:.1%})", "type": "negative"})
+    
+    return base_score
+
+def calculate_housing_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, breakdown):
+    """Housing Loan specific scoring - most comprehensive evaluation for largest loan amounts"""
+    
+    # Housing Need & Family Situation
+    housing_keywords = ['home', 'house', 'family', 'children', 'spouse', 'married', 'first time buyer']
+    housing_need = sum(1 for keyword in housing_keywords if keyword in essay_text.lower())
+    if housing_need >= 4:
+        base_score += 12
+        breakdown.append({"category": "Strong Housing Need", "points": 12, "reason": f"Clear housing necessity with {housing_need} factors", "type": "positive"})
+    
+    # Property Value Assessment
+    if requested_amount > 0:
+        if requested_amount <= 300000:  # Affordable housing
+            base_score += 8
+            breakdown.append({"category": "Affordable Property", "points": 8, "reason": f"Reasonable property price (RM {requested_amount:,.0f})", "type": "positive"})
+        elif requested_amount > 800000:  # High-end property
+            base_score -= 3
+            breakdown.append({"category": "Premium Property", "points": -3, "reason": f"High-value property (RM {requested_amount:,.0f})", "type": "neutral"})
+    
+    # Long-term Financial Stability
+    stability_keywords = ['permanent', 'senior', 'manager', 'professional', 'government', 'years experience']
+    stability_indicators = sum(1 for keyword in stability_keywords if keyword in payslip_text.lower())
+    if stability_indicators >= 2:
+        base_score += 15
+        breakdown.append({"category": "Employment Stability", "points": 15, "reason": f"Strong job security indicators", "type": "positive"})
+    
+    # Housing Loan Affordability (Most Critical)
+    monthly_income = extract_income_from_text(bank_text, payslip_text)
+    if monthly_income > 0 and requested_amount > 0:
+        monthly_mortgage = (requested_amount * 0.045) / 12  # Assume 4.5% interest
+        housing_ratio = monthly_mortgage / monthly_income
+        if housing_ratio < 0.3:
+            base_score += 20
+            breakdown.append({"category": "Excellent Housing Affordability", "points": 20, "reason": f"Very manageable mortgage ({housing_ratio:.1%} of income)", "type": "positive"})
+        elif housing_ratio < 0.4:
+            base_score += 10
+            breakdown.append({"category": "Good Housing Affordability", "points": 10, "reason": f"Acceptable mortgage ratio ({housing_ratio:.1%})", "type": "positive"})
+        elif housing_ratio > 0.5:
+            base_score -= 20
+            breakdown.append({"category": "Housing Affordability Risk", "points": -20, "reason": f"High mortgage burden ({housing_ratio:.1%})", "type": "negative"})
+    
+    # Asset & Savings for Down Payment
+    asset_keywords = ['savings', 'deposit', 'down payment', 'equity', 'assets', 'investment']
+    asset_strength = sum(1 for keyword in asset_keywords if keyword in bank_text.lower())
+    if asset_strength >= 3:
+        base_score += 10
+        breakdown.append({"category": "Strong Asset Position", "points": 10, "reason": "Evidence of sufficient assets/down payment", "type": "positive"})
+    
+    return base_score
+
+def calculate_default_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, breakdown):
+    """Default comprehensive scoring for unknown loan types"""
+    
+    # General Income Verification
+    income_keywords = ['salary', 'income', 'deposit', 'credit', 'payment received']
+    income_count = sum(1 for keyword in income_keywords if keyword in text_lower)
+    if income_count >= 3:
+        base_score += 12
+        breakdown.append({"category": "Income Evidence", "points": 12, "reason": f"Multiple income indicators", "type": "positive"})
+    
+    # General Financial Health
+    financial_keywords = ['savings', 'investment', 'balance']
+    financial_health = sum(1 for keyword in financial_keywords if keyword in bank_text.lower())
+    if financial_health >= 2:
+        base_score += 8
+        breakdown.append({"category": "Financial Health", "points": 8, "reason": "Positive financial indicators", "type": "positive"})
+    
+    return base_score
+
+def extract_income_from_text(bank_text, payslip_text):
+    """Extract estimated monthly income from documents"""
+    import re
+    
+    # Try to extract from payslip first
+    income_patterns = [
+        r'gross pay[:\s]*rm\s*([0-9,]+)',
+        r'basic salary[:\s]*rm\s*([0-9,]+)', 
+        r'monthly salary[:\s]*rm\s*([0-9,]+)',
+        r'net pay[:\s]*rm\s*([0-9,]+)'
+    ]
+    
+    for pattern in income_patterns:
+        matches = re.findall(pattern, payslip_text.lower())
+        if matches:
+            try:
+                return float(matches[0].replace(',', ''))
+            except:
+                continue
+    
+    # Fallback to bank statement analysis
+    deposit_pattern = r'rm\s*([0-9,]+)'
+    deposits = re.findall(deposit_pattern, bank_text.lower())
+    if deposits:
+        try:
+            # Use largest deposit as income estimate
+            return max([float(d.replace(',', '')) for d in deposits])
+        except:
+            pass
+    
+    return 4000  # Default fallback
+
+def apply_common_risk_factors(text_lower, bank_text, essay_text, payslip_text, base_score, breakdown):
+    """Apply risk factors common to all loan types"""
+    
+    # High-Risk Financial Activities
+    risk_keywords = ['gambling', 'crypto', 'bitcoin', 'bet', 'lottery', 'casino', 'forex trading']
+    risk_count = sum(1 for keyword in risk_keywords if keyword in text_lower)
+    if risk_count > 0:
+        base_score -= 20
+        breakdown.append({"category": "High-Risk Activities", "points": -20, "reason": f"Detected {risk_count} high-risk financial activities", "type": "negative"})
+    
+    # Existing Debt Load Analysis
+    debt_keywords = ['existing loan', 'credit card debt', 'installment', 'outstanding balance', 'monthly payment']
+    existing_debt = sum(1 for keyword in debt_keywords if keyword in text_lower)
+    if existing_debt >= 3:
+        base_score -= 12
+        breakdown.append({"category": "Heavy Debt Burden", "points": -12, "reason": "Multiple existing debt obligations", "type": "negative"})
+    elif existing_debt >= 1:
+        base_score -= 5
+        breakdown.append({"category": "Some Existing Debt", "points": -5, "reason": "Some existing financial obligations", "type": "neutral"})
+    
+    # Banking Relationship & History
+    banking_keywords = ['regular transactions', 'account history', 'long-standing customer', 'savings history']
+    banking_strength = sum(1 for keyword in banking_keywords if keyword in bank_text.lower())
+    if banking_strength >= 2:
+        base_score += 8
+        breakdown.append({"category": "Strong Banking History", "points": 8, "reason": "Good banking relationship evidence", "type": "positive"})
+    
+    # Document Quality Assessment
+    docs_provided = sum([1 for doc in [bank_text, essay_text, payslip_text] if len(doc.strip()) > 50])
+    if docs_provided == 3:
+        base_score += 10
+        breakdown.append({"category": "Complete Documentation", "points": 10, "reason": "All required documents provided", "type": "positive"})
+    elif docs_provided == 2:
+        base_score += 5
+        breakdown.append({"category": "Adequate Documentation", "points": 5, "reason": f"{docs_provided} out of 3 documents provided", "type": "neutral"})
+    elif docs_provided <= 1:
+        base_score -= 8
+        breakdown.append({"category": "Incomplete Documentation", "points": -8, "reason": "Insufficient documentation provided", "type": "negative"})
+    
+    # Financial Discipline Indicators
+    discipline_keywords = ['savings', 'emergency fund', 'investment', 'financial planning', 'budget']
+    discipline_score = sum(1 for keyword in discipline_keywords if keyword in text_lower)
+    if discipline_score >= 2:
+        base_score += 6
+        breakdown.append({"category": "Financial Discipline", "points": 6, "reason": "Evidence of financial planning and discipline", "type": "positive"})
+    
+    return base_score
+
+def extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_score, loan_type):
+    """
+    Extract specific risk factors with actual evidence from uploaded documents.
+    Focus on: Income vs Loan Amount, Suspicious Activities, Debt Obligations, and Essay-based Risks
+    """
+    import re
+    risk_flags = []
+    
+    # === 1. INCOME & REPAYMENT CAPACITY ANALYSIS (PAYSLIP) ===
+    salary_amount = None
+    if payslip_text and len(payslip_text.strip()) > 10:
+        payslip_lower = payslip_text.lower()
+        
+        # Extract salary amount
+        salary_pattern = r'(basic salary|gross pay|net pay|net salary|total earnings)[:\s]*rm\s*([0-9,]+)'
+        salary_matches = re.findall(salary_pattern, payslip_lower)
+        
+        if salary_matches:
+            try:
+                salary_amount = float(salary_matches[0][1].replace(',', ''))
+                
+                # Check repayment capacity (assume max 40% DSR)
+                max_monthly_repayment = salary_amount * 0.40
+                
+                # Estimate monthly installment (assuming 5-year tenure, 8% interest)
+                # This is a rough estimate for risk assessment
+                # Note: requested_amount would need to be passed to this function
+                
+                risk_flags.append({
+                    "flag": "Monthly Income Verified",
+                    "severity": "Info",
+                    "description": f"Monthly salary: RM {salary_amount:,.2f}. Maximum safe monthly repayment: RM {max_monthly_repayment:,.2f} (40% DSR)",
+                    "evidence_quote": f"Payslip shows: {salary_matches[0][0].title()} RM {salary_matches[0][1]}",
+                    "document_source": "Payslip"
+                })
+                
+                # Low income warning
+                if salary_amount < 2500:
+                    risk_flags.append({
+                        "flag": "Low Income - High Risk",
+                        "severity": "Critical",
+                        "description": f"Monthly income of RM {salary_amount:,.2f} is below recommended threshold for loan approval",
+                        "evidence_quote": f"Payslip shows: {salary_matches[0][0].title()} RM {salary_matches[0][1]}",
+                        "document_source": "Payslip"
+                    })
+                elif salary_amount < 4000:
+                    risk_flags.append({
+                        "flag": "Moderate Income - Careful Assessment",
+                        "severity": "Medium",
+                        "description": f"Monthly income of RM {salary_amount:,.2f} requires careful loan amount evaluation",
+                        "evidence_quote": f"Payslip shows: {salary_matches[0][0].title()} RM {salary_matches[0][1]}",
+                        "document_source": "Payslip"
+                    })
+                elif salary_amount > 10000:
+                    risk_flags.append({
+                        "flag": "Strong Income - Good Repayment Capacity",
+                        "severity": "Positive",
+                        "description": f"Strong monthly income of RM {salary_amount:,.2f} indicates good repayment capacity",
+                        "evidence_quote": f"Payslip shows: {salary_matches[0][0].title()} RM {salary_matches[0][1]}",
+                        "document_source": "Payslip"
+                    })
+            except:
+                pass
+        else:
+            # Cannot verify salary
+            if "image format" in payslip_lower or "document content detected" in payslip_lower:
+                risk_flags.append({
+                    "flag": "Income Amount Not Extractable",
+                    "severity": "High",
+                    "description": "Payslip in image format - unable to verify exact salary amount",
+                    "evidence_quote": "Payslip provided as scanned image. Manual income verification required.",
+                    "document_source": "Payslip"
+                })
+            else:
+                risk_flags.append({
+                    "flag": "Income Verification Failed",
+                    "severity": "High",
+                    "description": "Unable to locate salary amount in payslip document",
+                    "evidence_quote": "No clear salary figure found in payslip. Manual review needed.",
+                    "document_source": "Payslip"
+                })
+        
+        # Check for existing debt deductions
+        deduction_keywords = ['loan deduction', 'ptptn', 'housing loan', 'car loan', 'personal loan', 'court order', 'garnishment', 'debt recovery', 'repayment']
+        deductions_found = []
+        for keyword in deduction_keywords:
+            if keyword in payslip_lower:
+                # Try to find the line containing this keyword
+                for line in payslip_text.split('\n'):
+                    if keyword in line.lower():
+                        deductions_found.append(line.strip())
+                        break
+        
+        if deductions_found:
+            risk_flags.append({
+                "flag": "Existing Debt Obligations Detected",
+                "severity": "High", 
+                "description": "Applicant has ongoing loan repayments reducing disposable income",
+                "evidence_quote": f"Payslip shows deductions: {'; '.join(deductions_found[:2])}",
+                "document_source": "Payslip"
+            })
+    
+    # === 2. SUSPICIOUS SPENDING & FUND PATTERNS (BANK STATEMENT) ===
+    if bank_text and len(bank_text.strip()) > 10:
+        bank_lower = bank_text.lower()
+        
+        # Gambling Activities
+        gambling_keywords = ['casino', 'gambling', 'genting', 'jackpot', 'lottery', 'sports bet', 'online bet', '4d', 'toto', 'magnum']
+        gambling_found = [kw for kw in gambling_keywords if kw in bank_lower]
+        if gambling_found:
+            # Extract actual transaction lines
+            gambling_lines = []
+            for line in bank_text.split('\n'):
+                if any(kw in line.lower() for kw in gambling_found):
+                    gambling_lines.append(line.strip())
+                    if len(gambling_lines) >= 2:
+                        break
+            
+            risk_flags.append({
+                "flag": "Gambling Activities - High Risk",
+                "severity": "Critical",
+                "description": f"Bank statement shows gambling transactions - indicates financial instability",
+                "evidence_quote": f"Transactions: {'; '.join(gambling_lines[:2])}" if gambling_lines else f"Gambling keywords detected: {', '.join(gambling_found)}",
+                "document_source": "Bank Statement"
+            })
+        
+        # Cryptocurrency & High-Risk Trading
+        crypto_keywords = ['binance', 'coinbase', 'crypto.com', 'bitcoin', 'ethereum', 'btc', 'eth']
+        crypto_found = [kw for kw in crypto_keywords if kw in bank_lower]
+        if crypto_found:
+            risk_flags.append({
+                "flag": "High-Risk Investment Activities",
+                "severity": "High",
+                "description": "Cryptocurrency trading detected - volatile asset exposure",
+                "evidence_quote": f"Bank statement shows crypto-related transactions: {', '.join(crypto_found)}",
+                "document_source": "Bank Statement"
+            })
+        
+        # Overdraft / Insufficient Funds
+        overdraft_keywords = ['overdraft', 'insufficient fund', 'nsf', 'bounced', 'penalty', 'late fee']
+        overdraft_lines = []
+        for line in bank_text.split('\n'):
+            if any(kw in line.lower() for kw in overdraft_keywords):
+                overdraft_lines.append(line.strip())
+                if len(overdraft_lines) >= 2:
+                    break
+        
+        if overdraft_lines:
+            risk_flags.append({
+                "flag": "Poor Cash Flow Management",
+                "severity": "High",
+                "description": "Bank statement shows overdraft or insufficient fund issues",
+                "evidence_quote": f"Issues: {'; '.join(overdraft_lines[:2])}",
+                "document_source": "Bank Statement"
+            })
+        
+        # Suspicious Large Cash Withdrawals
+        withdrawal_pattern = r'(withdrawal|cash|atm)[^\n]*rm\s*([0-9,]+)'
+        withdrawals = re.findall(withdrawal_pattern, bank_lower)
+        if withdrawals:
+            amounts = []
+            for w in withdrawals:
+                try:
+                    amt = float(w[1].replace(',', ''))
+                    if amt > 5000:
+                        amounts.append(amt)
+                except:
+                    pass
+            
+            if amounts:
+                total_large_withdrawals = sum(amounts)
+                risk_flags.append({
+                    "flag": "Large Cash Withdrawals Detected",
+                    "severity": "Medium",
+                    "description": f"Total of RM {total_large_withdrawals:,.2f} in large cash withdrawals detected",
+                    "evidence_quote": f"Multiple withdrawals > RM 5,000 found. Largest: RM {max(amounts):,.2f}",
+                    "document_source": "Bank Statement"
+                })
+    
+    # === 3. DEBT OBLIGATIONS & POTENTIAL RISKS (ESSAY ANALYSIS) ===
+    if essay_text and len(essay_text.strip()) > 10:
+        essay_lower = essay_text.lower()
+        essay_sentences = [s.strip() for s in essay_text.split('.') if len(s.strip()) > 20]
+        
+        # Existing Debt / PTPTN Default Detection
+        debt_keywords = ['ptptn', 'default', 'existing loan', 'debt', 'owe', 'outstanding', 'arrears', 'pay off', 'clear debt']
+        for keyword in debt_keywords:
+            if keyword in essay_lower:
+                # Find the sentence containing this keyword
+                for sentence in essay_sentences:
+                    if keyword in sentence.lower():
+                        severity = "Critical" if keyword in ['default', 'ptptn', 'arrears'] else "High"
+                        risk_flags.append({
+                            "flag": "Existing Debt Obligations Disclosed",
+                            "severity": severity,
+                            "description": f"Applicant mentions existing debt obligations",
+                            "evidence_quote": f"Essay states: \"{sentence.strip()}\"",
+                            "document_source": "Loan Essay"
+                        })
+                        break
+                break
+        
+        # Financial Difficulties / Concerns
+        concern_keywords = {
+            'complex': 'financial complexity',
+            'difficult': 'financial difficulties',
+            'struggle': 'financial struggles',
+            'challenge': 'financial challenges',
+            'crisis': 'financial crisis',
+            'tight': 'tight finances',
+            'burden': 'financial burden'
+        }
+        
+        for keyword, description in concern_keywords.items():
+            if keyword in essay_lower:
+                for sentence in essay_sentences:
+                    if keyword in sentence.lower():
+                        risk_flags.append({
+                            "flag": "Financial Concerns Disclosed",
+                            "severity": "High",
+                            "description": f"Applicant acknowledges {description}",
+                            "evidence_quote": f"Essay states: \"{sentence.strip()}\"",
+                            "document_source": "Loan Essay"
+                        })
+                        break
+                break
+        
+        # Purpose Mismatch (e.g., Business loan for car purchase)
+        if loan_type in ["Micro-Business", "Business Loan"]:
+            personal_keywords = ['car', 'vehicle', 'house renovation', 'wedding', 'vacation', 'personal use']
+            personal_found = [kw for kw in personal_keywords if kw in essay_lower]
+            if personal_found:
+                for sentence in essay_sentences:
+                    if any(kw in sentence.lower() for kw in personal_found):
+                        risk_flags.append({
+                            "flag": "Loan Purpose Mismatch - Critical",
+                            "severity": "Critical",
+                            "description": f"Business loan requested but essay indicates personal use: {', '.join(personal_found)}",
+                            "evidence_quote": f"Essay states: \"{sentence.strip()}\"",
+                            "document_source": "Loan Essay"
+                        })
+                        break
+        
+        # Extended Repayment Tenure Request
+        tenure_pattern = r'(\d+)\s*(year|yr)'
+        tenure_matches = re.findall(tenure_pattern, essay_lower)
+        if tenure_matches:
+            tenure_years = int(tenure_matches[0][0])
+            if tenure_years > 7:
+                risk_flags.append({
+                    "flag": "Extended Repayment Period Requested",
+                    "severity": "Medium",
+                    "description": f"Applicant requests {tenure_years}-year tenure - may indicate repayment concerns",
+                    "evidence_quote": f"Essay requests {tenure_years} years repayment period",
+                    "document_source": "Loan Essay"
+                })
+        
+        # Insufficient Information Warning
+        if len(essay_text.strip()) < 100:
+            risk_flags.append({
+                "flag": "Insufficient Essay Information",
+                "severity": "Medium",
+                "description": "Loan essay too brief - insufficient detail on loan purpose and financial situation",
+                "evidence_quote": f"Essay length: {len(essay_text.strip())} characters. Detailed explanation recommended.",
+                "document_source": "Loan Essay"
+            })
+    else:
+        # No essay provided
+        risk_flags.append({
+            "flag": "Loan Essay Not Provided",
+            "severity": "High",
+            "description": "No loan purpose essay submitted - unable to assess loan intent and applicant's financial awareness",
+            "evidence_quote": "Loan essay document missing from application",
+            "document_source": "Loan Essay"
+        })
+    
+    # === 4. DOCUMENT COMPLETENESS CHECK ===
+    provided_docs = []
+    if bank_text and len(bank_text.strip()) > 50: provided_docs.append("Bank Statement")
+    if essay_text and len(essay_text.strip()) > 50: provided_docs.append("Loan Essay")
+    if payslip_text and len(payslip_text.strip()) > 50: provided_docs.append("Payslip")
+    
+    if len(provided_docs) < 3:
+        missing = [doc for doc in ["Bank Statement", "Loan Essay", "Payslip"] if doc not in provided_docs]
+        risk_flags.append({
+            "flag": "Incomplete Documentation",
+            "severity": "High",
+            "description": f"Missing required documents: {', '.join(missing)}",
+            "evidence_quote": f"Provided: {', '.join(provided_docs)} | Missing: {', '.join(missing)}",
+            "document_source": "Document Verification"
+        })
+    
+    return risk_flags
+
+
+def generate_mock_result(
+    loan_type: str,
+    raw_text: str = "",
+    application_id: str = "",
+    requested_amount: float = 0.0,
+    bank_text: str = "",
+    essay_text: str = "",
+    payslip_text: str = ""
+) -> dict:
+    """Comprehensive loan-specific scoring system based on actual document analysis"""
+    import hashlib, re
+    
+    # Generate deterministic but varied results based on actual content
+    content_hash = hashlib.md5(f"{application_id}{raw_text[:500]}".encode()).hexdigest()
+    hash_value = int(content_hash[:8], 16)
+    
+    # Loan-specific base scoring
+    loan_type_bases = {
+        "Micro-Business": 60,  # Higher risk, business-focused
+        "Personal": 65,       # Medium risk, income-focused
+        "Car": 70,           # Lower risk, asset-backed
+        "Housing": 55        # High amount, comprehensive evaluation
+    }
+    base_score = loan_type_bases.get(loan_type.replace(" Loan", ""), 65)
+    detailed_score_breakdown = []
+    
+    # Analyze actual text content for loan-specific comprehensive scoring
+    text_lower = raw_text.lower()
+    loan_clean_type = loan_type.replace(" Loan", "")
+    
+    # === LOAN-SPECIFIC SCORING SYSTEM ===
+    
+    # Apply loan-specific scoring
+    if loan_clean_type == "Micro-Business":
+        base_score = calculate_business_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, detailed_score_breakdown)
+    elif loan_clean_type == "Personal":
+        base_score = calculate_personal_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, detailed_score_breakdown)
+    elif loan_clean_type == "Car":
+        base_score = calculate_car_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, detailed_score_breakdown)
+    elif loan_clean_type == "Housing":
+        base_score = calculate_housing_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, detailed_score_breakdown)
+    else:
+        # Default comprehensive scoring for unknown loan types
+        base_score = calculate_default_loan_score(text_lower, bank_text, essay_text, payslip_text, requested_amount, base_score, detailed_score_breakdown)
+    
+    # Apply common risk factors for all loan types
+    base_score = apply_common_risk_factors(text_lower, bank_text, essay_text, payslip_text, base_score, detailed_score_breakdown)
+    
+    final_score = max(20, min(95, base_score))
+    
+    # Risk level and decision based on loan type
+    loan_thresholds = {
+        "Micro-Business": {"approve": 65, "review": 45},  # More flexible for business
+        "Personal": {"approve": 70, "review": 50},        # Standard thresholds
+        "Car": {"approve": 75, "review": 55},             # Higher bar due to asset
+        "Housing": {"approve": 80, "review": 60}          # Highest standards
+    }
+    
+    thresholds = loan_thresholds.get(loan_clean_type, {"approve": 70, "review": 50})
+    
+    if final_score >= thresholds["approve"]:
+        risk_level = "Low"
+        decision = "Approved"
+    elif final_score >= thresholds["review"]:
+        risk_level = "Medium" 
+        decision = "Review Required"
+    else:
+        risk_level = "High"
+        decision = "Rejected"
+    
+    # Risk level and decision
+    if final_score >= 75:
+        risk_level = "Low"
+        decision = "Approved"
+    elif final_score >= 55:
+        risk_level = "Medium" 
+        decision = "Review Required"
+    else:
+        risk_level = "High"
+        decision = "Rejected"
+    
+    # Generate forensic evidence from actual content
+    claim_vs_reality = []
+    if bank_text:
+        claim_vs_reality.append({
+            "claim_topic": "Bank Statement Analysis",
+            "essay_quote": "Bank statement provided for verification",
+            "statement_evidence": f"Statement contains {len(bank_text.split())} words of transaction data",
+            "status": "Verified",
+            "confidence": 90
+        })
+    
+    if essay_text:
+        claim_vs_reality.append({
+            "claim_topic": "Loan Purpose", 
+            "essay_quote": essay_text[:100] + "..." if len(essay_text) > 100 else essay_text,
+            "statement_evidence": "Detailed explanation provided in essay",
+            "status": "Verified",
+            "confidence": 85
+        })
+    # Extract specific risk flags with actual evidence from documents
+    key_risk_flags = extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_score, loan_clean_type)
+    
+    return {
+        "applicant_profile": {
+            "name": "Applicant",
+            "id": application_id,
+            "loan_type": loan_type
+        },
+        "risk_score_analysis": {
+            "final_score": final_score,
+            "risk_level": risk_level,
+            "score_breakdown": detailed_score_breakdown
+        },
+        "forensic_evidence": {
+            "claim_vs_reality": claim_vs_reality
+        },
+        "key_risk_flags": key_risk_flags,
+        "essay_insights": [],
+        "behavioral_insights": [],
+        "ai_reasoning_log": [
+            "[FALLBACK] AI analysis unavailable, using document-based heuristics",
+            f"[FALLBACK] Processed {len(raw_text)} characters of content",
+            f"[FALLBACK] Applied {len(detailed_score_breakdown)} scoring factors",
+            f"[FALLBACK] Generated risk score: {final_score}"
+        ],
+        "risk_score": final_score,
+        "risk_level": risk_level,
+        "final_decision": decision,
+        "document_texts": {
+            "bank_statement": bank_text,
+            "essay": essay_text, 
+            "payslip": payslip_text
+        }
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ---------------- Additional Operational Endpoints -----------------
+
+@app.post("/api/application/{application_id}/retry")
+async def retry_application(application_id: str):
+    """Retry processing for a FAILED application.
+    Resets status to PROCESSING and re-schedules background analysis.
+    """
+    with get_session() as session:
+        app_obj = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app_obj:
+            raise HTTPException(status_code=404, detail="Application not found")
+        if app_obj.status != ApplicationStatus.FAILED:
+            raise HTTPException(status_code=400, detail="Application is not in FAILED state")
+        # Cache required attributes before session closes
+        loan_type_val = app_obj.loan_type.value if hasattr(app_obj.loan_type, 'value') else str(app_obj.loan_type)
+        bank_path = app_obj.bank_statement_path or ''
+        essay_path_local = app_obj.essay_path
+        payslip_path_local = app_obj.payslip_path
+        app_obj.status = ApplicationStatus.PROCESSING
+        app_obj.updated_at = datetime.utcnow()
+        session.add(app_obj)
+        session.commit()
+
+    # Schedule background task on current event loop
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(process_application_background(
+            application_id,
+            loan_type_val,
+            bank_path,
+            essay_path_local,
+            payslip_path_local
+        ))
+    except RuntimeError:
+        # If no running loop, fallback to asyncio.run (blocking) – rare in FastAPI
+        asyncio.run(process_application_background(
+            application_id,
+            loan_type_val,
+            bank_path,
+            essay_path_local,
+            payslip_path_local
+        ))
+
+    return {"success": True, "status": "Processing", "message": "Retry scheduled"}
+
+
+@app.get("/api/application/{application_id}/reasoning")
+async def get_reasoning_subset(application_id: str):
+    """Return a lightweight reasoning subset to avoid large payload transfers."""
+    with get_session() as session:
+        app_obj = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app_obj:
+            raise HTTPException(status_code=404, detail="Application not found")
+        analysis = app_obj.analysis_result or {}
+        rsa = analysis.get("risk_score_analysis", {})
+        return {
+            "application_id": application_id,
+            "status": app_obj.status.value if app_obj.status else None,
+            "score": analysis.get("risk_score"),
+            "risk_level": analysis.get("risk_level"),
+            "final_decision": analysis.get("final_decision"),
+            "score_breakdown": rsa.get("score_breakdown", [])[:15],
+            "risk_flags": analysis.get("key_risk_flags", [])[:25],
+            "essay_insights_count": len(analysis.get("essay_insights", [])),
+            "reasoning_log": analysis.get("ai_reasoning_log", [])[:20]
+        }
