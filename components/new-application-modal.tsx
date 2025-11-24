@@ -39,8 +39,8 @@ export function NewApplicationModal() {
   const [batchFile, setBatchFile] = useState<File | null>(null)
 
   const handleSubmit = async () => {
-    if (!bankStatement || !icNumber) {
-      alert("Please provide IC Number and Bank Statement")
+    if (!bankStatement || !icNumber || !applicantName) {
+      alert("Please provide Applicant Name, IC Number and Bank Statement")
       return
     }
 
@@ -49,7 +49,7 @@ export function NewApplicationModal() {
       const formData = new FormData()
       formData.append("loan_type", loanType)
       formData.append("ic_number", icNumber)
-      formData.append("applicant_name", applicantName || "Unknown Applicant")
+      formData.append("applicant_name", applicantName)
       formData.append("requested_amount", requestedAmount)
       formData.append("bank_statement", bankStatement)
       if (essay) formData.append("essay", essay)
@@ -139,38 +139,40 @@ export function NewApplicationModal() {
           <TabsContent value="single" className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="loan-type">Loan Type</Label>
-                <select
-                  id="loan-type"
-                  value={loanType}
-                  onChange={(e) => setLoanType(e.target.value)}
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option>Micro-Business Loan</option>
-                  <option>Personal Loan</option>
-                  <option>Housing Loan</option>
-                  <option>Car Loan</option>
-                </select>
+                <Label htmlFor="applicant-name">Applicant Name *</Label>
+                <Input 
+                  id="applicant-name" 
+                  placeholder="e.g. Ali bin Ahmad"
+                  value={applicantName}
+                  onChange={(e) => setApplicantName(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ic-number">Applicant ID / IC</Label>
+                <Label htmlFor="ic-number">Applicant ID / IC *</Label>
                 <Input 
                   id="ic-number" 
                   placeholder="e.g. 890101-14-5566"
                   value={icNumber}
                   onChange={(e) => setIcNumber(e.target.value)}
+                  required
                 />
               </div>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="applicant-name">Applicant Name</Label>
-              <Input 
-                id="applicant-name" 
-                placeholder="e.g. Ali bin Ahmad"
-                value={applicantName}
-                onChange={(e) => setApplicantName(e.target.value)}
-              />
+              <Label htmlFor="loan-type">Loan Type</Label>
+              <select
+                id="loan-type"
+                value={loanType}
+                onChange={(e) => setLoanType(e.target.value)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option>Micro-Business Loan</option>
+                <option>Personal Loan</option>
+                <option>Housing Loan</option>
+                <option>Car Loan</option>
+              </select>
             </div>
             
             <div className="space-y-2">
@@ -226,7 +228,7 @@ export function NewApplicationModal() {
               <Button 
                 className="bg-emerald-600 hover:bg-emerald-700"
                 onClick={handleSubmit}
-                disabled={loading || !bankStatement || !icNumber}
+                disabled={loading || !bankStatement || !icNumber || !applicantName}
               >
                 {loading ? "Processing..." : "Start AI Analysis"}
               </Button>
