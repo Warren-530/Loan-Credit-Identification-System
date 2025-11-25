@@ -52,6 +52,33 @@ You MUST output **at least 10** distinct insights derived ONLY from the essay se
 **Important:** Do NOT mix insights between different applications - each analysis must be unique to THIS applicant's essay only.
 Never merge two sentences; never paraphrase inside `exact_quote`.
 
+### KEY RISK FLAGS (MANDATORY - MINIMUM 4 REQUIRED)
+You MUST output **at least 4** detailed risk flags after deep analysis of ALL THREE documents (Bank Statement, Loan Essay, Payslip).
+Each risk flag MUST include:
+- `flag`: Clear risk title (e.g., "Existing Debt Obligations Disclosed", "Insufficient Income Evidence", "Suspicious Spending Pattern")
+- `severity`: "High" | "Medium" | "Low"
+- `description`: Detailed explanation of the risk and its credit implications (2-3 sentences minimum)
+- `evidence_quote`: Exact verbatim quote from the document proving this risk exists
+- `ai_justification`: Why this matters for loan approval decision (1-2 sentences)
+- `document_source`: "Bank Statement" | "Loan Essay" | "Payslip"
+
+**Risk Categories to Analyze:**
+1. **Debt & Financial Obligations:** PTPTN, existing loans, credit cards, informal debts, monthly commitments mentioned in essay or seen in bank statement
+2. **Income Stability & Affordability:** Income fluctuations, low balance warnings, income vs. expense ratio, ability to service new loan
+3. **Spending Behavior Risks:** Gambling, excessive luxury spending, overdrafts, frequent cash withdrawals, round-tripping
+4. **Trustworthiness & Consistency:** Essay claims vs. bank statement reality, missing information, vague explanations, purpose mismatches
+5. **Repayment Capability:** Unrealistic repayment plans, extended tenure requests, thin savings buffer, irregular income patterns
+6. **Business/Employment Risks:** (If applicable) Business expense verification, employment stability, gig work irregularity
+
+**CRITICAL:** Even if the application seems good, find at least 4 potential risks or areas of concern. Look deeper into:
+- Essay mentions of financial struggles, even if phrased positively
+- Bank statement patterns that suggest tight cashflow
+- Any debt obligations mentioned anywhere
+- Income sufficiency for the requested loan amount
+- Repayment plan realism
+
+Do NOT skip this section. Do NOT output generic placeholder risks. Each risk must be specific to THIS application with real evidence quotes.
+
 ### OUTPUT JSON (STRICT, NO MARKDOWN)
 {
   "applicant_profile": {
@@ -91,11 +118,22 @@ Never merge two sentences; never paraphrase inside `exact_quote`.
   ],
   "key_risk_flags": [
     {
-      "flag": "Gambling Activity Detected",
+      "flag": "Existing Debt Obligations Disclosed",
+      "severity": "Medium",
+      "description": "Applicant mentions existing PTPTN student loan obligation which will impact debt servicing ratio. This recurring commitment reduces available income for new loan repayment and increases overall credit exposure.",
+      "evidence_quote": "Essay states: '00: • PTPTN Student Loan: RM 180'",
+      "ai_justification": "Existing debt obligations directly affect loan affordability and increase default risk if income is insufficient to cover all commitments.",
+      "document_source": "Loan Essay"
+    },
+    {
+      "flag": "Income Verification Needed",
       "severity": "High",
-      "description": "Essay or statement references gambling keywords.",
-      "evidence_quote": "Transfer Genting Resort RM500"
+      "description": "No clear recurring salary deposits visible in bank statement to verify claimed income level. Irregular deposit patterns make it difficult to assess true repayment capacity.",
+      "evidence_quote": "Bank statement shows sporadic transfers without consistent monthly salary pattern",
+      "ai_justification": "Without verified stable income, the risk of default increases significantly as repayment capability cannot be confirmed.",
+      "document_source": "Bank Statement"
     }
+    // Minimum 4 risk flags required - analyze deeper to find more potential risks
   ],
   "ai_reasoning_log": ["[00:01] Parsed essay into N sentences", "[00:02] Scoring adjustments applied", "[00:03] Generated 8+ essay insights"]
 }
