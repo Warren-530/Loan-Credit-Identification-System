@@ -191,40 +191,27 @@ async def get_application(application_id: str):
 
 @app.delete("/api/application/{application_id}")
 async def delete_application(application_id: str):
-    """Delete an application and its associated files"""
-    with get_session() as session:
-        app = session.query(Application).filter(Application.application_id == application_id).first()
+    print(f"Deleting {application_id}")
+    try:
+        from database import engine
+        from sqlmodel import Session, select
         
-        if not app:
-            raise HTTPException(status_code=404, detail="Application not found")
-        
-        # Delete associated files
-        files_to_delete = [
-            app.application_form_path,
-            app.bank_statement_path,
-            app.essay_path,
-            app.payslip_path
-        ]
-        
-        for file_path in files_to_delete:
-            if file_path and os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    print(f"✓ Deleted file: {file_path}")
-                except Exception as e:
-                    print(f"⚠ Failed to delete file {file_path}: {e}")
-        
-        # Delete from cache
-        cache_entry = session.query(AnalysisCache).filter(AnalysisCache.application_id == application_id).first()
-        if cache_entry:
-            session.delete(cache_entry)
-        
-        # Delete application record
-        session.delete(app)
-        session.commit()
-        
-        print(f"✓ Deleted application: {application_id}")
-        return {"message": "Application deleted successfully", "application_id": application_id}
+        with Session(engine) as session:
+            statement = select(Application).where(Application.application_id == application_id)
+            app = session.exec(statement).first()
+            if app:
+                session.delete(app)
+                session.commit()
+                print(f"Successfully deleted {application_id}")
+            else:
+                print(f"Application {application_id} not found")
+                
+        return {"status": "success", "id": application_id}
+    except Exception as e:
+        print(f"Error deleting application: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "detail": str(e)}
 
 
 @app.get("/api/status/{application_id}")

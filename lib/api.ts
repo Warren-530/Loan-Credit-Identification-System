@@ -99,4 +99,12 @@ export const api = {
     if (!response.ok) throw new Error('Failed to fetch status');
     return response.json();
   },
+
+  async deleteApplication(applicationId: string): Promise<void> {
+    try {
+      await fetch(`${API_BASE_URL}/api/application/${applicationId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error("Delete failed", e);
+    }
+  },
 };

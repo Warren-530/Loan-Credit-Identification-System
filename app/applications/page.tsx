@@ -43,8 +43,8 @@ export default function ApplicationsPage() {
   const [filteredApplications, setFilteredApplications] = useState<Application[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Filter states
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set())
@@ -163,22 +163,6 @@ export default function ApplicationsPage() {
     }
   }
 
-  const handleDelete = async () => {
-    try {
-      const deletePromises = Array.from(selectedIds).map(id =>
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${id}`, {
-          method: 'DELETE'
-        })
-      )
-      await Promise.all(deletePromises)
-      setSelectedIds(new Set())
-      setShowDeleteDialog(false)
-      await loadApplications()
-    } catch (error) {
-      console.error("Failed to delete applications:", error)
-    }
-  }
-
   const toggleStatusFilter = (status: string) => {
     const newFilters = new Set(statusFilters)
     if (newFilters.has(status)) {
@@ -187,6 +171,17 @@ export default function ApplicationsPage() {
       newFilters.add(status)
     }
     setStatusFilters(newFilters)
+  }
+
+  const handleDelete = async () => {
+    // Simple delete implementation
+    const ids = Array.from(selectedIds);
+    for (const id of ids) {
+      await api.deleteApplication(id);
+    }
+    setSelectedIds(new Set());
+    setShowDeleteDialog(false);
+    window.location.reload(); // Force reload to ensure state is fresh
   }
 
   const toggleReviewStatusFilter = (status: string) => {
@@ -630,7 +625,7 @@ export default function ApplicationsPage() {
               {isExporting ? 'Exporting...' : `Export (${selectedIds.size})`}
             </Button>
 
-            {/* Delete */}
+            {/* Delete Button */}
             <Button 
               variant="outline" 
               size="sm"
