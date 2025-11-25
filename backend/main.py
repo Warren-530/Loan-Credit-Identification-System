@@ -5,10 +5,12 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTa
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional, List
 import os
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 import asyncio
@@ -299,7 +301,11 @@ async def process_application_background(
         # Application Form (NEW - extract applicant info)
         try:
             print(f"Extracting application form from: {application_form_path}")
-            application_form_text = pdf_processor.extract_text(application_form_path) if application_form_path.endswith('.pdf') else text_processor.extract_text(application_form_path)
+            if application_form_path.endswith('.pdf'):
+                application_form_text = await run_in_threadpool(pdf_processor.extract_text, application_form_path)
+            else:
+                application_form_text = await run_in_threadpool(text_processor.extract_text, application_form_path)
+            
             raw_text += f"\n\n=== APPLICATION FORM ===\n{application_form_text}"
             print(f"✓ Application form extracted: {len(application_form_text)} characters")
         except Exception as e:
@@ -310,7 +316,11 @@ async def process_application_background(
         # Bank Statement
         try:
             print(f"Extracting bank statement from: {bank_statement_path}")
-            bank_text = pdf_processor.extract_text(bank_statement_path) if bank_statement_path.endswith('.pdf') else text_processor.extract_text(bank_statement_path)
+            if bank_statement_path.endswith('.pdf'):
+                bank_text = await run_in_threadpool(pdf_processor.extract_text, bank_statement_path)
+            else:
+                bank_text = await run_in_threadpool(text_processor.extract_text, bank_statement_path)
+            
             raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
             print(f"✓ Bank statement extracted: {len(bank_text)} characters")
         except Exception as e:
@@ -321,7 +331,11 @@ async def process_application_background(
         # Essay
         try:
             print(f"Extracting essay from: {essay_path}")
-            essay_text = pdf_processor.extract_text(essay_path) if essay_path.endswith('.pdf') else text_processor.extract_text(essay_path)
+            if essay_path.endswith('.pdf'):
+                essay_text = await run_in_threadpool(pdf_processor.extract_text, essay_path)
+            else:
+                essay_text = await run_in_threadpool(text_processor.extract_text, essay_path)
+            
             raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
             print(f"✓ Essay extracted: {len(essay_text)} characters")
         except Exception as e:
@@ -332,7 +346,11 @@ async def process_application_background(
         # Payslip
         try:
             print(f"Extracting payslip from: {payslip_path}")
-            payslip_text = pdf_processor.extract_text(payslip_path) if payslip_path.endswith('.pdf') else text_processor.extract_text(payslip_path)
+            if payslip_path.endswith('.pdf'):
+                payslip_text = await run_in_threadpool(pdf_processor.extract_text, payslip_path)
+            else:
+                payslip_text = await run_in_threadpool(text_processor.extract_text, payslip_path)
+            
             raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
             print(f"✓ Payslip extracted: {len(payslip_text)} characters")
         except Exception as e:
@@ -344,47 +362,59 @@ async def process_application_background(
 
         result = None
         processing_start = datetime.utcnow()
+        
+        # 1. Check Cache (Short transaction)
+        cached_result = None
         with get_session() as session:
             cached = session.query(AnalysisCache).filter(AnalysisCache.application_id == application_id).first()
             if cached:
-                print("✓ Using cached result")
-                result = cached.result_json
-            elif ai_engine:
-                try:
-                    print("⚡ Running AI analysis with Gemini...")
-                    # Pass application_form_text to AI for extraction
-                    result = ai_engine.analyze_application(
-                        application_form_text, 
-                        raw_text, 
-                        bank_text, 
-                        essay_text, 
-                        payslip_text, 
-                        application_id,
-                        application_form_path=application_form_path
-                    )
-                    print("✓ AI analysis completed (Gemini)")
+                cached_result = cached.result_json
+        
+        if cached_result:
+            print("✓ Using cached result")
+            result = cached_result
+        elif ai_engine:
+            # 2. Run AI Analysis (No DB transaction held)
+            try:
+                print("⚡ Running AI analysis with Gemini...")
+                # Pass application_form_text to AI for extraction
+                # CRITICAL: Use run_in_threadpool to prevent blocking the main thread during heavy AI/Image processing
+                result = await run_in_threadpool(
+                    ai_engine.analyze_application,
+                    application_form_text, 
+                    raw_text, 
+                    bank_text, 
+                    essay_text, 
+                    payslip_text, 
+                    application_id,
+                    application_form_path=application_form_path
+                )
+                print("✓ AI analysis completed (Gemini)")
+                
+                # 3. Cache Result (Short transaction)
+                with get_session() as session:
                     cache = AnalysisCache(application_id=application_id, result_json=result)
                     session.add(cache)
                     session.commit()
                     print("✓ Result cached")
-                except Exception as e:
-                    print(f"❌ AI analysis failed: {e}")
-                    if AI_ONLY_MODE:
-                        print("🚫 AI-ONLY MODE: Refusing to use fallback - marking as FAILED")
-                        raise Exception(f"AI analysis required but failed: {e}")
-                    else:
-                        print("🔄 Falling back to document-based analysis...")
-                        result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
-                        print("✓ Fallback analysis completed")
-            else:
+            except Exception as e:
+                print(f"❌ AI analysis failed: {e}")
                 if AI_ONLY_MODE:
-                    print("🚫 AI-ONLY MODE: No API key configured - refusing to process")
-                    raise Exception("AI analysis required but GEMINI_API_KEY not configured")
+                    print("🚫 AI-ONLY MODE: Refusing to use fallback - marking as FAILED")
+                    raise Exception(f"AI analysis required but failed: {e}")
                 else:
-                    print("ℹ No Gemini API key configured")
-                    print("🔄 Using document-based analysis...")
+                    print("🔄 Falling back to document-based analysis...")
                     result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
-                    print("✓ Document-based analysis completed")
+                    print("✓ Fallback analysis completed")
+        else:
+            if AI_ONLY_MODE:
+                print("🚫 AI-ONLY MODE: No API key configured - refusing to process")
+                raise Exception("AI analysis required but GEMINI_API_KEY not configured")
+            else:
+                print("ℹ No Gemini API key configured")
+                print("🔄 Using document-based analysis...")
+                result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
+                print("✓ Document-based analysis completed")
         
         # Calculate processing time
         processing_end = datetime.utcnow()
