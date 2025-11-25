@@ -449,6 +449,11 @@ Risk 7-8: Low severity - Potential future risks, documentation completeness, or 
 ### OUTPUT JSON (STRICT, NO MARKDOWN)
 Output ONLY valid JSON with NO comments, NO markdown code blocks, NO extra text.
 
+**CRITICAL ARRAY REQUIREMENTS - DO NOT SKIP:**
+- `forensic_evidence.claim_vs_reality`: MINIMUM 5 items (cross-verify essay claims against all documents)
+- `essay_insights`: MINIMUM 10 items (extract sentence-level insights from essay)
+- `key_risk_flags`: MINIMUM 8 items (identify risks from all 4 documents)
+
 Required structure:
 ```json
 {
@@ -556,17 +561,30 @@ Required structure:
       }
     ]
   },
+  "decision_justification": {
+    "recommendation": "APPROVE or REJECT or REVIEW",
+    "key_reasons": [
+      "string (concise bullet point explaining why approve/reject/review, max 2 sentences each)"
+    ],
+    "strengths": [
+      "string (positive factors supporting approval, if any)"
+    ],
+    "concerns": [
+      "string (negative factors leading to rejection or caution)"
+    ],
+    "overall_assessment": "string (2-3 sentences summarizing the final decision rationale)"
+  },
   "forensic_evidence": {
     "claim_vs_reality": [
       {
-        "claim_topic": "string (specific claim from essay)",
-        "essay_quote": "string (exact quote from Loan Essay)",
-        "statement_evidence": "string (evidence from Bank Statement)",
-        "payslip_evidence": "string (evidence from Payslip, if applicable)",
-        "application_form_evidence": "string (evidence from Application Form, if applicable)",
+        "claim_topic": "string (MANDATORY - specific claim from essay)",
+        "essay_quote": "string (MANDATORY - exact quote from Loan Essay)",
+        "statement_evidence": "string (MANDATORY - evidence from Bank Statement)",
+        "payslip_evidence": "string (evidence from Payslip, use 'N/A' if not applicable)",
+        "application_form_evidence": "string (evidence from Application Form, use 'N/A' if not applicable)",
         "status": "Verified or Contradicted or Inconclusive",
         "confidence": 0,
-        "ai_justification": "string (explain why this verification matters)"
+        "ai_justification": "string (MANDATORY - explain why this verification matters)"
       }
     ]
   },
@@ -593,17 +611,49 @@ Required structure:
 ```
 
 CRITICAL REQUIREMENTS:
-1. `financial_metrics`: REQUIRED - must calculate all 6 metrics with evidence
-2. `essay_insights` array: MINIMUM 10 items
-3. `key_risk_flags` array: MINIMUM 8 items (MANDATORY - INCREASED)
-4. `forensic_evidence.claim_vs_reality` array: MINIMUM 5 items comparing essay claims to all documents
-5. `ai_summary`: REQUIRED - 200-300 word comprehensive analysis
-6. `risk_score_analysis.final_score`: Integer 0-100
-7. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
-8. **SCORE BREAKDOWN VALIDATION (CRITICAL)**: The sum of all points in `score_breakdown` array MUST equal `final_score`. For example, if breakdown has [+20, +15, -10, +25, -5], the sum is 45, so final_score MUST be 45. Double-check your math before outputting!
-9. All string values must be properly escaped (use \" for quotes inside strings)
-10. NO JavaScript comments in output
-11. All arrays must have minimum items as specified
+1. `decision_justification`: REQUIRED - must provide clear recommendation with reasons
+   - `recommendation`: Must be EXACTLY "APPROVE" or "REJECT" or "REVIEW" based on risk score and analysis
+     * APPROVE: Risk Score ≥ 70 (Low Risk - Strong financials, minimal concerns)
+     * REVIEW: Risk Score 50-69 (Medium Risk - Requires human review, mixed signals)
+     * REJECT: Risk Score < 50 (High Risk - Critical dealbreakers, too risky)
+   - `key_reasons`: 3-5 concise bullet points (max 2 sentences each) explaining the decision
+   - `strengths`: 2-4 positive factors (always include, even when rejecting)
+   - `concerns`: 2-5 negative factors or risks (always include, even when approving)
+   - `overall_assessment`: 2-3 sentences summarizing why this decision makes sense
+2. `financial_metrics`: REQUIRED - must calculate all 6 metrics with evidence
+3. `essay_insights` array: MINIMUM 10 items
+4. `key_risk_flags` array: MINIMUM 8 items (MANDATORY - INCREASED)
+5. `forensic_evidence.claim_vs_reality` array: MINIMUM 5 items comparing essay claims to all documents
+6. `ai_summary`: REQUIRED - 200-300 word comprehensive analysis
+7. `risk_score_analysis.final_score`: Integer 0-100
+8. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
+9. **SCORE BREAKDOWN VALIDATION (CRITICAL)**: The sum of all points in `score_breakdown` array MUST equal `final_score`. For example, if breakdown has [+20, +15, -10, +25, -5], the sum is 45, so final_score MUST be 45. Double-check your math before outputting!
+10. All string values must be properly escaped (use \" for quotes inside strings)
+11. NO JavaScript comments in output
+12. All arrays must have minimum items as specified
+
+### DECISION JUSTIFICATION GUIDELINES
+
+**If REJECT (Risk Score < 50)**:
+- `recommendation`: "REJECT"
+- `key_reasons`: Focus on critical dealbreakers (high debt, gambling, income instability, fraud flags)
+- `strengths`: Acknowledge any positive aspects (stable employment, some savings) to show balanced analysis
+- `concerns`: List major risks that outweigh strengths
+- `overall_assessment`: Explain why risks are too high to approve
+
+**If REVIEW (Risk Score 50-69)**:
+- `recommendation`: "REVIEW"
+- `key_reasons`: Explain why human judgment is needed (borderline metrics, conflicting signals, need additional verification)
+- `strengths`: List positive factors that could support approval with conditions
+- `concerns`: Note risks that require human assessment or additional documentation
+- `overall_assessment`: Explain why this case needs manual review rather than auto-decision
+
+**If APPROVE (Risk Score ≥ 70)**:
+- `recommendation`: "APPROVE"
+- `key_reasons`: Highlight strong points (verified income, low debt, savings, stable employment)
+- `strengths`: Emphasize financial stability, repayment capacity, trustworthiness
+- `concerns`: Note any minor risks or conditions (e.g., "Monitor cashflow closely", "Ensure timely payments")
+- `overall_assessment`: Explain why applicant is creditworthy despite minor concerns
 
 ### AI SUMMARY GENERATION (MANDATORY)
 
