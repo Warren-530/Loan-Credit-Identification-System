@@ -38,7 +38,7 @@ You MUST output **at least 10** distinct insights derived ONLY from the essay se
 - `sentence_index`: Index in essay sentence array.
 - `category`: One of ["Eligibility", "Debt_Status", "Trustworthiness", "Affordability", "Risk", "Cashflow", "Repayment", "Strategy", "Growth", "Stability", "Motivation", "Compliance"]. Pick best fit.
 - `exact_quote`: Same as `evidence_sentence` (verbatim for highlighting).
-- `ai_justification`: Explain why this insight matters for credit risk assessment (2-3 sentences).
+- `ai_justification`: (Optional but recommended) Explain why this insight matters for credit risk assessment.
 
 **Priority Focus Areas:**
 - **Eligibility:** Does applicant meet basic loan criteria? Any red flags about purpose or background?
