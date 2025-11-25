@@ -688,6 +688,14 @@ async def verify_application(
         app.reviewed_at = datetime.utcnow()
         app.review_status = ReviewStatus.MANUAL_OVERRIDE if is_override else ReviewStatus.HUMAN_VERIFIED
         
+        # Update status based on decision
+        if decision == 'Approved':
+            app.status = ApplicationStatus.APPROVED
+        elif decision == 'Rejected':
+            app.status = ApplicationStatus.REJECTED
+        else:  # Review Required
+            app.status = ApplicationStatus.COMPLETED  # Keep as completed but flagged for review
+        
         if is_override and override_reason:
             app.override_reason = override_reason
         

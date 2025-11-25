@@ -231,6 +231,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     financial_dna?: FinancialDna | null;
     financial_metrics?: FinancialMetrics;
     applicant_profile?: ApplicantProfile;
+    ai_summary?: string;
     document_texts?: { bank_statement?: string; essay?: string; payslip?: string };
     cross_verification?: { claim_topic?: string; evidence_found?: string; status?: string };
     compliance_audit?: { bias_check?: string; source_of_wealth?: string };
@@ -370,20 +371,20 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.setFont('helvetica', 'normal')
       doc.text('Credit Risk Assessment Report', 20, 30)
       
-      // Application Info Box
+      // Application Info Box - Use AI-extracted data when available
       doc.setTextColor(0, 0, 0)
       doc.setFillColor(241, 245, 249) // slate-100
       doc.rect(20, 50, 170, 40, 'F')
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text(name, 25, 60)
+      doc.text(analysis?.applicant_profile?.name || name, 25, 60)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.text(`Application ID: ${resolvedParams.id}`, 25, 68)
-      doc.text(`Loan Type: ${appData.loan_type || 'N/A'}`, 25, 75)
-      doc.text(`Requested Amount: ${appData.requested_amount ? `RM ${appData.requested_amount.toLocaleString()}` : 'N/A'}`, 25, 82)
+      doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || appData.loan_type || 'Personal Loan'}`, 25, 75)
+      doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : (appData.requested_amount ? `RM ${appData.requested_amount.toLocaleString()}` : 'Not Specified')}`, 25, 82)
       doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 130, 68)
-      doc.text(`Status: ${appData.status}`, 130, 75)
+      doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 75)
       
       // Risk Score Section with color coding (0-100 scale)
       const riskColor = riskScore >= 80 ? [16, 185, 129] : riskScore >= 60 ? [251, 191, 36] : [244, 63, 94]
@@ -407,78 +408,158 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.setFont('helvetica', 'normal')
       doc.text(`Risk Level: ${riskLevel}`, 140, 120, { align: 'center' })
       
-      // Score Drivers Table
+      // Score Calculation Breakdown Table
       let yPos = 140
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text('Score Drivers', 20, yPos)
+      doc.text('Risk Score Calculation Breakdown', 20, yPos)
 
-      autoTable(doc, {
-        startY: yPos + 5,
-        head: [['Category', 'Points', 'Reason']],
-        body: scoreBreakdown.map(sb => [
-          sb.category,
-          (sb.points > 0 ? '+' : '') + sb.points,
-          sb.reason
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 20, right: 20 },
-        columnStyles: { 2: { cellWidth: 90 } }
-      })
-      
-      // @ts-expect-error - autoTable adds finalY to doc
-      yPos = doc.lastAutoTable.finalY + 15
-      
-      // AI Risk Analysis
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('AI Risk Analysis', 20, yPos)
-      
-      autoTable(doc, {
-        startY: yPos + 5,
-        head: [['Risk Flag', 'Description', 'Severity']],
-        body: keyFindings.map(f => [
-          f.flag,
-          f.description,
-          f.type === 'Negative' ? 'High' : f.type === 'Neutral' ? 'Medium' : 'Low'
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 20, right: 20 },
-        columnStyles: {
-          1: { cellWidth: 100 }
-        }
-      })
-      
-      // @ts-expect-error - autoTable adds finalY to doc
-      yPos = doc.lastAutoTable.finalY + 15
-      
-      // Forensic Cross-Verification (if space allows)
-      if (yPos < 250) {
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.text('Forensic Cross-Verification', 20, yPos)
-        
+      if (scoreBreakdown && scoreBreakdown.length > 0) {
         autoTable(doc, {
           startY: yPos + 5,
-          head: [['Claim', 'Evidence', 'Confidence', 'Status']],
-          body: [
-            ['Income Verification', 'Salary deposits match claimed amount', '94%', 'Verified'],
-            ['Employment Stability', 'Regular monthly deposits detected', '91%', 'Verified'],
-            ['Risk Assessment', 'No high-risk transactions found', '100%', 'Verified'],
-            ['Financial Capacity', 'Debt-to-income ratio within limits', '88%', 'Verified']
-          ],
+          head: [['Category', 'Points', 'Reason']],
+          body: scoreBreakdown.map(sb => [
+            sb.category,
+            (sb.points > 0 ? '+' : '') + sb.points,
+            sb.reason
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 20, right: 20 },
+          columnStyles: { 2: { cellWidth: 90 } }
+        })
+        
+        // @ts-expect-error - autoTable adds finalY to doc
+        yPos = doc.lastAutoTable.finalY + 10
+      } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.text('Score breakdown not available for this analysis.', 25, yPos + 10)
+        yPos += 20
+      }
+      
+      // AI Risk Flags Analysis
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Key Risk Flags & Findings', 20, yPos)
+      
+      if (riskFlags && riskFlags.length > 0) {
+        autoTable(doc, {
+          startY: yPos + 5,
+          head: [['Risk Flag', 'Severity', 'Description']],
+          body: riskFlags.slice(0, 10).map(f => [
+            f.flag,
+            f.severity || 'Medium',
+            f.description || 'See detailed analysis'
+          ]),
           theme: 'grid',
           headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           margin: { left: 20, right: 20 },
           columnStyles: {
-            1: { cellWidth: 60 }
+            0: { cellWidth: 50 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 95 }
           }
         })
+        
+        // @ts-expect-error - autoTable adds finalY to doc
+        yPos = doc.lastAutoTable.finalY + 10
+      } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.text('No risk flags identified for this application.', 25, yPos + 10)
+        yPos += 20
+      }
+      
+      // Forensic Cross-Verification - Use actual data
+      if (yPos < 220 && forensicEvidence.length > 0) {
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Forensic Cross-Document Verification', 20, yPos)
+        
+        autoTable(doc, {
+          startY: yPos + 5,
+          head: [['Claim Topic', 'Status', 'Confidence', 'Evidence']],
+          body: forensicEvidence.slice(0, 5).map(fe => [
+            fe.claim_topic || 'N/A',
+            fe.status || 'N/A',
+            `${fe.confidence}%` || 'N/A',
+            (fe.statement_evidence || 'N/A').substring(0, 60) + '...'
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 20, right: 20 },
+          columnStyles: {
+            0: { cellWidth: 40 },
+            3: { cellWidth: 70 }
+          }
+        })
+        
+        // @ts-expect-error - autoTable adds finalY to doc
+        yPos = doc.lastAutoTable.finalY + 10
+      }
+      
+      // Financial Metrics Summary (if space allows and data exists)
+      if (yPos < 220 && analysis?.financial_metrics) {
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Financial Metrics Summary', 20, yPos)
+        
+        const metrics = analysis.financial_metrics
+        const metricsData = []
+        
+        if (metrics.debt_service_ratio) {
+          metricsData.push([
+            'Debt Service Ratio (DSR)',
+            `${metrics.debt_service_ratio.value.toFixed(1)}%`,
+            metrics.debt_service_ratio.assessment || 'N/A'
+          ])
+        }
+        if (metrics.net_disposable_income) {
+          metricsData.push([
+            'Net Disposable Income',
+            `RM ${metrics.net_disposable_income.value.toLocaleString()}`,
+            metrics.net_disposable_income.assessment || 'N/A'
+          ])
+        }
+        if (metrics.savings_rate) {
+          metricsData.push([
+            'Savings Rate',
+            `${metrics.savings_rate.value.toFixed(1)}%`,
+            metrics.savings_rate.assessment || 'N/A'
+          ])
+        }
+        
+        if (metricsData.length > 0) {
+          autoTable(doc, {
+            startY: yPos + 5,
+            head: [['Metric', 'Value', 'Assessment']],
+            body: metricsData,
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 20, right: 20 }
+          })
+          
+          // @ts-expect-error - autoTable adds finalY to doc
+          yPos = doc.lastAutoTable.finalY + 10
+        }
+      }
+      
+      // AI Summary (on new page if needed)
+      if (analysis?.ai_summary) {
+        doc.addPage()
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('AI Applicant Summary', 20, 20)
+        
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        const summaryLines = doc.splitTextToSize(analysis.ai_summary, 170)
+        doc.text(summaryLines, 20, 30)
       }
       
       // Footer
@@ -603,32 +684,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               </div>
             </div>
             
-            {/* Navigation and Decision Group */}
-            <div className="flex items-center gap-4">
-              {/* Rapid Review Navigation */}
-              <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => void navigateApplication('previous')}
-                  className="text-slate-600"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium text-slate-600 min-w-[60px] text-center">
-                  {currentPosition} of {totalApplications}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => void navigateApplication('next')}
-                  className="text-slate-600"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Decision Buttons */}
+            {/* Navigation and Decision Group - Reorganized for Visibility */}
+            <div className="flex flex-col items-end gap-3">
+              {/* Decision Buttons - Top Row for Maximum Visibility */}
               <div className="flex items-center space-x-2">
                 <Button 
                   variant="outline" 
@@ -649,38 +707,36 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   )}
                 </Button>
                 
-                {/* Manual Decision Override Buttons - Underwriter Control */}
-                <div className="border-l border-slate-300 pl-2 flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-rose-600 border-rose-300 hover:bg-rose-50"
-                    onClick={() => handleDecisionClick('Rejected')}
-                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                  >
-                    <AlertTriangle className="mr-1 h-3 w-3" />
-                    Reject
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                    onClick={() => handleDecisionClick('Review Required')}
-                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                  >
-                    <AlertCircle className="mr-1 h-3 w-3" />
-                    Review
-                  </Button>
-                  <Button 
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleDecisionClick('Approved')}
-                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                  >
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    Approve
-                  </Button>
-                </div>
+                {/* Manual Decision Buttons */}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-rose-600 border-rose-300 hover:bg-rose-50"
+                  onClick={() => handleDecisionClick('Rejected')}
+                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                >
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Reject
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                  onClick={() => handleDecisionClick('Review Required')}
+                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                >
+                  <AlertCircle className="mr-1 h-3 w-3" />
+                  Review
+                </Button>
+                <Button 
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => handleDecisionClick('Approved')}
+                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                >
+                  <CheckCircle className="mr-1 h-3 w-3" />
+                  Approve
+                </Button>
                 
                 {appData.status === 'Failed' && (
                   <Button 
@@ -693,11 +749,34 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </Button>
                 )}
               </div>
+
+              {/* Rapid Review Navigation - Second Row */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => void navigateApplication('previous')}
+                  className="text-slate-600"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium text-slate-600 min-w-[60px] text-center">
+                  {currentPosition} of {totalApplications}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => void navigateApplication('next')}
+                  className="text-slate-600"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Applicant Information Card - Extracted from Application Form */}
+        {/* Applicant Information Card - Moved to Top */}
         {analysis?.applicant_profile && (
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
             <CardHeader>
@@ -717,7 +796,6 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
-                {/* Personal Details */}
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase">Full Name</p>
@@ -737,7 +815,6 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
                 
-                {/* Loan & Financial Details */}
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase">Loan Type</p>
@@ -763,7 +840,6 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
                 
-                {/* Full Width Items */}
                 <div className="col-span-2 space-y-3 pt-3 border-t border-blue-200">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase">Address</p>
@@ -795,60 +871,66 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       <p className="text-sm text-slate-900">{analysis.applicant_profile.family_members || 'N/A'}</p>
                     </div>
                   </div>
-                  {analysis.applicant_profile.bank_institution && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase">Bank Reference</p>
-                      <p className="text-sm text-slate-900">
-                        {analysis.applicant_profile.bank_institution}
-                        {analysis.applicant_profile.bank_account && ` - A/C: ${analysis.applicant_profile.bank_account}`}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-900">Score Drivers</CardTitle>
-            <CardDescription>Evidence-based additive / deductive factors</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {scoreBreakdown.map((item: ScoreBreakdownItem, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      item.type === 'positive' ? 'bg-emerald-100 text-emerald-600' :
-                      item.type === 'negative' ? 'bg-rose-100 text-rose-600' :
-                      'bg-slate-200 text-slate-600'
+        {/* Risk Score Breakdown - Show Calculation Transparency */}
+        {scoreBreakdown && scoreBreakdown.length > 0 && (
+          <Card className="bg-gradient-to-br from-slate-50 to-gray-50 border-slate-300 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-slate-900 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-slate-600" />
+                Risk Score Calculation Breakdown
+              </CardTitle>
+              <CardDescription>Transparent scoring showing how the {riskScore}/100 risk score was calculated</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {scoreBreakdown.map((item, idx) => {
+                  const isPositive = item.type === 'positive'
+                  const isNegative = item.type === 'negative'
+                  const pointsDisplay = item.points > 0 ? `+${item.points}` : item.points
+                  
+                  return (
+                    <div key={idx} className={`flex items-start justify-between p-3 rounded-lg border-2 ${
+                      isPositive ? 'bg-emerald-50 border-emerald-200' :
+                      isNegative ? 'bg-rose-50 border-rose-200' :
+                      'bg-slate-50 border-slate-200'
                     }`}>
-                      {item.type === 'positive' ? <TrendingUp className="h-4 w-4" /> :
-                       item.type === 'negative' ? <AlertTriangle className="h-4 w-4" /> :
-                       <CheckCircle className="h-4 w-4" />}
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-slate-900">{item.category}</h4>
+                        <p className="text-xs text-slate-600 mt-1">{item.reason}</p>
+                      </div>
+                      <div className="ml-4 flex flex-col items-end">
+                        <span className={`text-2xl font-bold ${
+                          isPositive ? 'text-emerald-700' :
+                          isNegative ? 'text-rose-700' :
+                          'text-slate-700'
+                        }`}>
+                          {pointsDisplay}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium mt-0.5">POINTS</span>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-slate-900">{item.category}</p>
-                      <p className="text-xs text-slate-500">{item.reason}</p>
-                    </div>
+                  )
+                })}
+                
+                <div className="mt-4 p-3 bg-slate-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-white">TOTAL RISK SCORE</span>
+                    <span className="text-3xl font-bold text-white">{riskScore}/100</span>
                   </div>
-                  <div className={`font-bold ${
-                    item.points > 0 ? 'text-emerald-600' : 
-                    item.points < 0 ? 'text-rose-600' : 'text-slate-600'
-                  }`}>
-                    {item.points > 0 ? '+' : ''}{item.points}
-                  </div>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Score Interpretation: 80-100 = Low Risk (Approve), 60-79 = Medium Risk (Review), 0-59 = High Risk (Reject)
+                  </p>
                 </div>
-              ))}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-200 mt-4">
-                <span className="font-bold text-slate-900">Final Score</span>
-                <span className="text-2xl font-bold text-blue-600">{riskScore}/100</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Financial Metrics Section - Comprehensive Analysis */}
         {analysis && analysis.financial_metrics && Object.keys(analysis.financial_metrics).length > 0 && (

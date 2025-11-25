@@ -502,9 +502,10 @@ CRITICAL REQUIREMENTS:
 5. `ai_summary`: REQUIRED - 200-300 word comprehensive analysis
 6. `risk_score_analysis.final_score`: Integer 0-100
 7. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
-8. All string values must be properly escaped (use \" for quotes inside strings)
-9. NO JavaScript comments in output
-10. All arrays must have minimum items as specified
+8. **SCORE BREAKDOWN VALIDATION (CRITICAL)**: The sum of all points in `score_breakdown` array MUST equal `final_score`. For example, if breakdown has [+20, +15, -10, +25, -5], the sum is 45, so final_score MUST be 45. Double-check your math before outputting!
+9. All string values must be properly escaped (use \" for quotes inside strings)
+10. NO JavaScript comments in output
+11. All arrays must have minimum items as specified
 
 ### AI SUMMARY GENERATION (MANDATORY)
 

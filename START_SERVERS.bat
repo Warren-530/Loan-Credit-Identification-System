@@ -20,7 +20,7 @@ timeout /t 3 /nobreak >nul
 echo.
 echo Starting Frontend Server (Port 3000)...
 cd /d "%~dp0"
-start "TrustLens Frontend" cmd /k "npm start"
+start "TrustLens Frontend" cmd /k "npm run dev"
 
 timeout /t 8 /nobreak >nul
 
