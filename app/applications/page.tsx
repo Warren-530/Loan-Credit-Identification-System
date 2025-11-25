@@ -31,10 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowUpRight, Search, Filter, ArrowUpDown, CheckSquare, Trash2, Bot, User, AlertCircle as OverrideIcon, AlertTriangle, CheckCircle, Clock } from "lucide-react"
+import { ArrowUpRight, Search, Filter, ArrowUpDown, CheckSquare, Trash2, Bot, User, AlertCircle as OverrideIcon, AlertTriangle, CheckCircle, Clock, FileDown } from "lucide-react"
 import Link from "next/link"
 import { api, type Application } from "@/lib/api"
 import { Checkbox } from "@/components/ui/checkbox"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([])
@@ -42,6 +44,7 @@ export default function ApplicationsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Filter states
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set())
@@ -206,6 +209,304 @@ export default function ApplicationsPage() {
     setLoanTypeFilters(newFilters)
   }
 
+  const handleExportSelected = async () => {
+    if (selectedIds.size === 0) return
+    
+    setIsExporting(true)
+    try {
+      const selectedApps = applications.filter(app => selectedIds.has(app.id))
+      
+      for (const app of selectedApps) {
+        // Fetch full application details for each selected record
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${app.id}`)
+        if (!response.ok) continue
+        
+        const appData = await response.json()
+        const analysis = appData.analysis_result
+        
+        // Create PDF for this application
+        const doc = new jsPDF()
+        
+        // Extract data
+        const name = analysis?.applicant_profile?.name || appData.applicant_name || "Unknown"
+        const riskScore = appData.risk_score || 0
+        const finalDecision = appData.final_decision || appData.status
+        const riskLevel = appData.risk_level || (riskScore >= 66 ? "Low" : riskScore >= 41 ? "Medium" : "High")
+        const scoreBreakdown = analysis?.risk_score_analysis?.score_breakdown || []
+        const riskFlags = analysis?.key_risk_flags || []
+        const forensicEvidence = analysis?.forensic_evidence?.claim_vs_reality || []
+        
+        // ==================== PAGE 1: EXECUTIVE SUMMARY ====================
+        // Header
+        doc.setFillColor(15, 23, 42)
+        doc.rect(0, 0, 210, 40, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(24)
+        doc.setFont('helvetica', 'bold')
+        doc.text('TRUSTLENS AI', 20, 20)
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'normal')
+        doc.text('Credit Risk Assessment Report', 20, 30)
+        
+        // Application Info Box
+        doc.setTextColor(0, 0, 0)
+        doc.setFillColor(241, 245, 249)
+        doc.rect(20, 50, 170, 40, 'F')
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.text(name, 25, 60)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Application ID: ${app.id}`, 25, 68)
+        doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || app.type || 'Personal Loan'}`, 25, 75)
+        doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : app.amount}`, 25, 82)
+        doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 130, 68)
+        doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 75)
+        
+        // Risk Score Section
+        const riskColor = riskScore >= 80 ? [16, 185, 129] : riskScore >= 60 ? [251, 191, 36] : [244, 63, 94]
+        doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
+        doc.rect(20, 100, 60, 25, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(28)
+        doc.setFont('helvetica', 'bold')
+        doc.text(riskScore.toString(), 50, 115, { align: 'center' })
+        doc.setFontSize(10)
+        doc.text('RISK SCORE (/100)', 50, 122, { align: 'center' })
+        
+        // Decision Section
+        doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
+        doc.rect(90, 100, 100, 25, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(20)
+        doc.setFont('helvetica', 'bold')
+        doc.text(finalDecision.toUpperCase(), 140, 112, { align: 'center' })
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Risk Level: ${riskLevel}`, 140, 120, { align: 'center' })
+        
+        // Score Breakdown Table
+        let yPos = 140
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Risk Score Calculation Breakdown', 20, yPos)
+        
+        if (scoreBreakdown && scoreBreakdown.length > 0) {
+          autoTable(doc, {
+            startY: yPos + 5,
+            head: [['Category', 'Points', 'Reason']],
+            body: scoreBreakdown.map((sb: { category: string; points: number; reason: string }) => [
+              sb.category,
+              (sb.points > 0 ? '+' : '') + sb.points,
+              sb.reason
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 20, right: 20 },
+            columnStyles: { 2: { cellWidth: 90 } }
+          })
+          
+          yPos = (doc as any).lastAutoTable.finalY + 10
+        }
+        
+        // Risk Flags
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Key Risk Flags & Findings', 20, yPos)
+        
+        if (riskFlags && riskFlags.length > 0) {
+          autoTable(doc, {
+            startY: yPos + 5,
+            head: [['Risk Flag', 'Severity', 'Description']],
+            body: riskFlags.slice(0, 10).map((f: { flag: string; severity: string; description: string }) => [
+              f.flag,
+              f.severity || 'Medium',
+              f.description || 'See detailed analysis'
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 20, right: 20 },
+            columnStyles: {
+              0: { cellWidth: 50 },
+              1: { cellWidth: 25 },
+              2: { cellWidth: 95 }
+            }
+          })
+          
+          yPos = (doc as any).lastAutoTable.finalY + 10
+        }
+        
+        // ==================== PAGE 2: DECISION JUSTIFICATION ====================
+        if (analysis?.decision_justification) {
+          doc.addPage()
+          yPos = 20
+          
+          doc.setFillColor(15, 23, 42)
+          doc.rect(0, yPos - 5, 210, 12, 'F')
+          doc.setTextColor(255, 255, 255)
+          doc.setFontSize(16)
+          doc.setFont('helvetica', 'bold')
+          doc.text('DECISION JUSTIFICATION', 105, yPos + 3, { align: 'center' })
+          yPos += 15
+          
+          const justification = analysis.decision_justification
+          const recommendation = justification.recommendation || finalDecision
+          
+          // Recommendation Badge
+          doc.setTextColor(0, 0, 0)
+          const recColor = recommendation === 'APPROVE' ? [16, 185, 129] : 
+                          recommendation === 'REVIEW' ? [251, 191, 36] : [244, 63, 94]
+          doc.setFillColor(recColor[0], recColor[1], recColor[2])
+          doc.roundedRect(20, yPos, 170, 15, 3, 3, 'F')
+          doc.setTextColor(255, 255, 255)
+          doc.setFontSize(18)
+          doc.setFont('helvetica', 'bold')
+          doc.text(`RECOMMENDATION: ${recommendation}`, 105, yPos + 10, { align: 'center' })
+          yPos += 25
+          
+          // Overall Assessment
+          if (justification.overall_assessment) {
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(12)
+            doc.setFont('helvetica', 'bold')
+            doc.text('Overall Assessment:', 20, yPos)
+            yPos += 7
+            
+            doc.setFontSize(10)
+            doc.setFont('helvetica', 'normal')
+            const assessmentLines = doc.splitTextToSize(justification.overall_assessment, 170)
+            doc.text(assessmentLines, 20, yPos)
+            yPos += (assessmentLines.length * 5) + 10
+          }
+          
+          // Strengths and Concerns
+          if (justification.strengths || justification.concerns) {
+            let leftY = yPos
+            if (justification.strengths && justification.strengths.length > 0) {
+              doc.setFontSize(11)
+              doc.setFont('helvetica', 'bold')
+              doc.setTextColor(16, 185, 129)
+              doc.text('✓ STRENGTHS', 20, leftY)
+              leftY += 7
+              
+              doc.setFontSize(9)
+              doc.setFont('helvetica', 'normal')
+              doc.setTextColor(0, 0, 0)
+              justification.strengths.forEach((strength: string, idx: number) => {
+                const lines = doc.splitTextToSize(`${idx + 1}. ${strength}`, 80)
+                doc.text(lines, 22, leftY)
+                leftY += lines.length * 4 + 2
+              })
+            }
+            
+            let rightY = yPos
+            if (justification.concerns && justification.concerns.length > 0) {
+              doc.setFontSize(11)
+              doc.setFont('helvetica', 'bold')
+              doc.setTextColor(244, 63, 94)
+              doc.text('⚠ CONCERNS', 110, rightY)
+              rightY += 7
+              
+              doc.setFontSize(9)
+              doc.setFont('helvetica', 'normal')
+              doc.setTextColor(0, 0, 0)
+              justification.concerns.forEach((concern: string, idx: number) => {
+                const lines = doc.splitTextToSize(`${idx + 1}. ${concern}`, 80)
+                doc.text(lines, 112, rightY)
+                rightY += lines.length * 4 + 2
+              })
+            }
+            
+            yPos = Math.max(leftY, rightY) + 10
+          }
+        }
+        
+        // ==================== PAGE 3: FINANCIAL METRICS ====================
+        if (analysis?.financial_metrics) {
+          doc.addPage()
+          yPos = 20
+          
+          doc.setFillColor(15, 23, 42)
+          doc.rect(0, yPos - 5, 210, 12, 'F')
+          doc.setTextColor(255, 255, 255)
+          doc.setFontSize(16)
+          doc.setFont('helvetica', 'bold')
+          doc.text('FINANCIAL METRICS ANALYSIS', 105, yPos + 3, { align: 'center' })
+          yPos += 18
+          
+          const metrics = analysis.financial_metrics
+          const metricsList = [
+            { key: 'debt_service_ratio', label: 'Debt Service Ratio (DSR)', unit: '%' },
+            { key: 'net_disposable_income', label: 'Net Disposable Income', unit: 'RM' },
+            { key: 'savings_rate', label: 'Savings Rate', unit: '%' },
+            { key: 'per_capita_income', label: 'Per Capita Income', unit: 'RM' }
+          ]
+          
+          metricsList.forEach(({ key, label, unit }) => {
+            const metric = metrics[key as keyof typeof metrics]
+            if (metric && (metric as any).value !== undefined) {
+              const metricValue = (metric as any).value
+              const metricAssessment = (metric as any).assessment
+              
+              doc.setDrawColor(203, 213, 225)
+              doc.setFillColor(248, 250, 252)
+              doc.rect(20, yPos, 170, 22, 'FD')
+              
+              doc.setFontSize(10)
+              doc.setFont('helvetica', 'bold')
+              doc.setTextColor(0, 0, 0)
+              doc.text(label, 22, yPos + 6)
+              
+              doc.setFontSize(14)
+              doc.setTextColor(37, 99, 235)
+              const displayValue = unit === 'RM' ? 
+                `${unit} ${metricValue.toLocaleString()}` : 
+                `${metricValue.toFixed(1)}${unit}`
+              doc.text(displayValue, 22, yPos + 15)
+              
+              if (metricAssessment) {
+                const assessColor = metricAssessment.toLowerCase().includes('good') || 
+                                   metricAssessment.toLowerCase().includes('excellent') ? [16, 185, 129] :
+                                   metricAssessment.toLowerCase().includes('concern') ||
+                                   metricAssessment.toLowerCase().includes('high') ? [244, 63, 94] :
+                                   [251, 191, 36]
+                doc.setFillColor(assessColor[0], assessColor[1], assessColor[2])
+                doc.roundedRect(140, yPos + 3, 48, 6, 1, 1, 'F')
+                doc.setFontSize(7)
+                doc.setTextColor(255, 255, 255)
+                doc.text(metricAssessment.substring(0, 22), 164, yPos + 7, { align: 'center' })
+              }
+              
+              yPos += 26
+            }
+          })
+        }
+        
+        // Footer
+        const pageCount = doc.getNumberOfPages()
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i)
+          doc.setFontSize(9)
+          doc.setTextColor(100, 116, 139)
+          doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' })
+        }
+        
+        // Save PDF with unique name
+        doc.save(`TrustLens_Report_${app.id}_${new Date().toISOString().split('T')[0]}.pdf`)
+        
+        // Small delay between exports
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      
+    } catch (error) {
+      console.error('Batch export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const uniqueLoanTypes = Array.from(new Set(applications.map(app => app.type).filter(Boolean)))
 
   return (
@@ -262,13 +563,13 @@ export default function ApplicationsPage() {
                 ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Review Status</DropdownMenuLabel>
-                {['AI Pending', 'Verified', 'Manual Override'].map(status => (
+                {['AI_Pending', 'Human_Verified', 'Manual_Override'].map(status => (
                   <DropdownMenuCheckboxItem
                     key={status}
                     checked={reviewStatusFilters.has(status)}
                     onCheckedChange={() => toggleReviewStatusFilter(status)}
                   >
-                    {status}
+                    {status.replace('_', ' ')}
                   </DropdownMenuCheckboxItem>
                 ))}
                 <DropdownMenuSeparator />
@@ -315,6 +616,18 @@ export default function ApplicationsPage() {
             >
               <CheckSquare className="h-4 w-4 mr-2" />
               {selectedIds.size === filteredApplications.length && filteredApplications.length > 0 ? 'Deselect All' : 'Select All'}
+            </Button>
+
+            {/* Export */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleExportSelected}
+              disabled={selectedIds.size === 0 || isExporting}
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              {isExporting ? 'Exporting...' : `Export (${selectedIds.size})`}
             </Button>
 
             {/* Delete */}
@@ -445,12 +758,12 @@ export default function ApplicationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {app.review_status === "Manual Override" ? (
+                      {app.review_status === "Manual_Override" ? (
                         <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                           <OverrideIcon className="h-3 w-3 mr-1" />
                           Manual Override
                         </Badge>
-                      ) : app.review_status === "Verified" ? (
+                      ) : app.review_status === "Human_Verified" ? (
                         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                           <User className="h-3 w-3 mr-1" />
                           Verified

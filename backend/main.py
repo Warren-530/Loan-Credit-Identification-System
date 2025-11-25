@@ -105,7 +105,7 @@ async def get_applications(limit: int = 50):
                 "score": app.risk_score or 0,
                 "status": app.final_decision if app.status == ApplicationStatus.APPROVED else app.status,
                 "date": app.created_at.isoformat(),
-                "review_status": app.review_status,
+                "review_status": app.review_status.value if app.review_status else "AI Pending",
                 "ai_decision": app.ai_decision,
                 "human_decision": app.human_decision,
             }
