@@ -48,11 +48,37 @@ You will receive data wrapped in XML tags for clear document boundaries:
 From the "=== APPLICATION FORM ===" section, extract:
 - **Name**: Full name from "NAME:" field
 - **IC Number/Passport**: From "MYKAD/PASSPORT NO:" field
-- **Loan Type**: From checked box in "LOAN TYPE" section (Micro-Business Loan, Personal Loan, Housing Loan, Car Loan)
+
+- **Loan Type (CRITICAL - NOISY OCR HANDLING)**: 
+  - The checkboxes often appear as "noisy" characters due to OCR errors.
+  - **Selected Marks**: Look for `[x]`, `[X]`, `(x)`, `✓`, `☑`, `✔`, `■`, `▪`, `●`
+  - **OCR Artifacts (Common Misrecognitions)**: Also accept `[L]`, `[l]`, `[7]`, `[J]`, `[/]`, `[\\]`, `[1]`, `[I]`, `[|]`, `[v]`, `[V]`, or patterns like `|/|`, `_/_` next to the loan type text
+  - **Context Clue**: Compare all four loan types (Micro-Business Loan, Personal Loan, Housing Loan, Car Loan). The one with ANY non-empty character inside or next to the brackets is the selected one
+  - **Visual Pattern**: Look for asymmetry - if three options show `[ ]` (empty) and one shows `[7]` or `[L]` (contains something), that one is selected
+  - **Example Patterns**:
+    * `[ ] Personal Loan` vs `[L] Micro-Business Loan` → **Micro-Business Loan** is selected
+    * `[ ] Housing Loan` vs `[/] Car Loan` → **Car Loan** is selected
+    * `☐ Personal` vs `☑ Housing` → **Housing Loan** is selected
+  - **Fallback Strategy**: If all checkboxes appear identical, look for:
+    * Bold text on one option
+    * Isolated spacing around one option
+    * Extra characters/apostrophes near one option (e.g., "Micro-Business Loan'")
+    * If still unclear, cross-reference with Essay content mentioning business/housing/car
+  - **Options**: Micro-Business Loan, Personal Loan, Housing Loan, Car Loan (select ONLY ONE)
+
 - **Requested Amount**: From "DESIRED LOAN AMOUNT (RM)" field
 - **Annual Income**: From "ANNUAL INCOME (RM)" field
 - **Period/Tenure**: From "PERIOD" field
-- **Loan Purpose**: From checked boxes in "LOAN WILL BE USED FOR" section
+
+- **Loan Purpose (MULTI-SELECT - NOISY OCR HANDLING)**:
+  - Extract ALL purposes that have selection marks (multiple checkboxes can be ticked)
+  - Use the same "Noisy OCR" logic as Loan Type above
+  - **Selected Indicators**: `[x]`, `✓`, `☑`, `■`, `[L]`, `[7]`, `[/]`, `[|]`, `[v]`, `_/_`, `|/|`, or any non-empty bracket
+  - **Compare Empty vs Non-Empty**: `[ ] Business Launching` (not selected) vs `[/] House Buying` (selected)
+  - **Options Include**: Business Launching, House Buying, Credit Cards, Home Improvement, Investment, Internet Loans, Education, Car Buying, Other (followed by text field)
+  - **Return Format**: Comma-separated list of ALL selected purposes (e.g., "House Buying, Home Improvement")
+  - **If No Clear Marks**: Cross-reference with Essay topic - if essay talks about buying a house, "House Buying" is likely selected
+
 - **Contact Info**: Phone, Email, Address, Birth Date, Marital Status, Family Members
 - **Bank References**: Institution Name, Address, Phone, Saving Account number
 

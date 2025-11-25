@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { AICopilot } from "@/components/ai-copilot"
-import { AlertTriangle, CheckCircle, Shield, AlertCircle, TrendingUp, Building2, Calendar, Banknote, Terminal, Zap, Download, ChevronLeft, ChevronRight, Bot, User } from "lucide-react"
+import { AlertTriangle, CheckCircle, Shield, AlertCircle, TrendingUp, Building2, Calendar, Banknote, Terminal, Zap, Download, ChevronLeft, ChevronRight, Bot, User, MessageSquare, FileText } from "lucide-react"
 import { api, type ApplicationDetail } from "@/lib/api"
 import { use } from "react"
 import jsPDF from 'jspdf'
@@ -364,6 +364,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     try {
       const doc = new jsPDF()
       
+      // ==================== PAGE 1: EXECUTIVE SUMMARY ====================
       // Header
       doc.setFillColor(15, 23, 42) // slate-900
       doc.rect(0, 0, 210, 40, 'F')
@@ -553,26 +554,187 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         }
       }
       
-      // AI Summary (on new page if needed)
-      if (analysis?.ai_summary) {
+      // ==================== PAGE 2: DECISION JUSTIFICATION ====================
+      if (analysis?.decision_justification) {
         doc.addPage()
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.text('AI Applicant Summary', 20, 20)
+        yPos = 20
         
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-        const summaryLines = doc.splitTextToSize(analysis.ai_summary, 170)
-        doc.text(summaryLines, 20, 30)
+        // Section Header
+        doc.setFillColor(15, 23, 42)
+        doc.rect(0, yPos - 5, 210, 12, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.text('DECISION JUSTIFICATION', 105, yPos + 3, { align: 'center' })
+        yPos += 15
+        
+        const justification = analysis.decision_justification
+        const recommendation = justification.recommendation || finalDecision
+        
+        // Recommendation Badge
+        doc.setTextColor(0, 0, 0)
+        const recColor = recommendation === 'APPROVE' ? [16, 185, 129] : 
+                        recommendation === 'REVIEW' ? [251, 191, 36] : [244, 63, 94]
+        doc.setFillColor(recColor[0], recColor[1], recColor[2])
+        doc.roundedRect(20, yPos, 170, 15, 3, 3, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(18)
+        doc.setFont('helvetica', 'bold')
+        doc.text(`RECOMMENDATION: ${recommendation}`, 105, yPos + 10, { align: 'center' })
+        yPos += 25
+        
+        // Overall Assessment
+        if (justification.overall_assessment) {
+          doc.setTextColor(0, 0, 0)
+          doc.setFontSize(12)
+          doc.setFont('helvetica', 'bold')
+          doc.text('Overall Assessment:', 20, yPos)
+          yPos += 7
+          
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'normal')
+          const assessmentLines = doc.splitTextToSize(justification.overall_assessment, 170)
+          doc.text(assessmentLines, 20, yPos)
+          yPos += (assessmentLines.length * 5) + 10
+        }
+        
+        // Strengths and Concerns in Two Columns
+        if (justification.strengths || justification.concerns) {
+          // Strengths Column
+          let leftY = yPos
+          if (justification.strengths && justification.strengths.length > 0) {
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(16, 185, 129)
+            doc.text('✓ STRENGTHS', 20, leftY)
+            leftY += 7
+            
+            doc.setFontSize(9)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(0, 0, 0)
+            justification.strengths.forEach((strength: string, idx: number) => {
+              const lines = doc.splitTextToSize(`${idx + 1}. ${strength}`, 80)
+              doc.text(lines, 22, leftY)
+              leftY += lines.length * 4 + 2
+            })
+          }
+          
+          // Concerns Column
+          let rightY = yPos
+          if (justification.concerns && justification.concerns.length > 0) {
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(244, 63, 94)
+            doc.text('⚠ CONCERNS', 110, rightY)
+            rightY += 7
+            
+            doc.setFontSize(9)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(0, 0, 0)
+            justification.concerns.forEach((concern: string, idx: number) => {
+              const lines = doc.splitTextToSize(`${idx + 1}. ${concern}`, 80)
+              doc.text(lines, 112, rightY)
+              rightY += lines.length * 4 + 2
+            })
+          }
+          
+          yPos = Math.max(leftY, rightY) + 10
+        }
+        
+        // Key Reasons
+        if (justification.key_reasons && justification.key_reasons.length > 0) {
+          doc.setFontSize(12)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(0, 0, 0)
+          doc.text('Key Reasons for Decision:', 20, yPos)
+          yPos += 7
+          
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'normal')
+          justification.key_reasons.forEach((reason: string, idx: number) => {
+            const lines = doc.splitTextToSize(`${idx + 1}. ${reason}`, 170)
+            doc.text(lines, 20, yPos)
+            yPos += lines.length * 4 + 3
+          })
+        }
       }
       
-      // Footer
+      // ==================== PAGE 3: FINANCIAL METRICS ====================
+      if (analysis?.financial_metrics) {
+        doc.addPage()
+        yPos = 20
+        
+        // Section Header
+        doc.setFillColor(15, 23, 42)
+        doc.rect(0, yPos - 5, 210, 12, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.text('FINANCIAL METRICS ANALYSIS', 105, yPos + 3, { align: 'center' })
+        yPos += 18
+        
+        const metrics = analysis.financial_metrics
+        const metricsList = [
+          { key: 'debt_service_ratio', label: 'Debt Service Ratio (DSR)', unit: '%' },
+          { key: 'net_disposable_income', label: 'Net Disposable Income', unit: 'RM' },
+          { key: 'savings_rate', label: 'Savings Rate', unit: '%' },
+          { key: 'per_capita_income', label: 'Per Capita Income', unit: 'RM' }
+        ]
+        
+        metricsList.forEach(({ key, label, unit }) => {
+          const metric = metrics[key as keyof FinancialMetrics]
+          if (metric && metric.value !== undefined) {
+            if (yPos > 250) {
+              doc.addPage()
+              yPos = 20
+            }
+            
+            // Metric Box
+            doc.setDrawColor(203, 213, 225)
+            doc.setFillColor(248, 250, 252)
+            doc.rect(20, yPos, 170, 22, 'FD')
+            
+            // Label
+            doc.setFontSize(10)
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(0, 0, 0)
+            doc.text(label, 22, yPos + 6)
+            
+            // Value
+            doc.setFontSize(14)
+            doc.setTextColor(37, 99, 235)
+            const displayValue = unit === 'RM' ? 
+              `${unit} ${metric.value.toLocaleString()}` : 
+              `${metric.value.toFixed(1)}${unit}`
+            doc.text(displayValue, 22, yPos + 15)
+            
+            // Assessment Badge
+            if (metric.assessment) {
+              const assessColor = metric.assessment.toLowerCase().includes('good') || 
+                                 metric.assessment.toLowerCase().includes('excellent') ? [16, 185, 129] :
+                                 metric.assessment.toLowerCase().includes('concern') ||
+                                 metric.assessment.toLowerCase().includes('high') ? [244, 63, 94] :
+                                 [251, 191, 36]
+              doc.setFillColor(assessColor[0], assessColor[1], assessColor[2])
+              doc.roundedRect(140, yPos + 3, 48, 6, 1, 1, 'F')
+              doc.setFontSize(7)
+              doc.setTextColor(255, 255, 255)
+              const assessText = metric.assessment.substring(0, 22)
+              doc.text(assessText, 164, yPos + 7, { align: 'center' })
+            }
+            
+            yPos += 26
+          }
+        })
+      }
+      
+      // Footer on all pages - Page number only
       const pageCount = doc.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
-        doc.setFontSize(8)
+        doc.setFontSize(9)
         doc.setTextColor(100, 116, 139)
-        doc.text(`Generated by TrustLens AI - Financial Forensics Platform | Page ${i} of ${pageCount}`, 105, 290, { align: 'center' })
+        doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' })
       }
       
       // Save PDF
@@ -922,6 +1084,102 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Decision Justification Section - NEW */}
+        {analysis?.decision_justification && (
+          <Card className={`border-2 shadow-lg ${
+            analysis.decision_justification.recommendation === 'APPROVE' 
+              ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-300' 
+              : analysis.decision_justification.recommendation === 'REVIEW'
+              ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300'
+              : 'bg-gradient-to-br from-rose-50 to-red-50 border-rose-300'
+          }`}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-slate-900 flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Decision Justification
+                  </CardTitle>
+                  <CardDescription>AI reasoning for {analysis.decision_justification.recommendation.toLowerCase()} recommendation</CardDescription>
+                </div>
+                <Badge className={`text-sm font-bold ${
+                  analysis.decision_justification.recommendation === 'APPROVE'
+                    ? 'bg-emerald-600 text-white'
+                    : analysis.decision_justification.recommendation === 'REVIEW'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-rose-600 text-white'
+                }`}>
+                  {analysis.decision_justification.recommendation}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Overall Assessment */}
+              <div className="p-4 bg-white/80 rounded-lg border-2 border-slate-200">
+                <p className="text-sm font-medium text-slate-900 leading-relaxed">
+                  {analysis.decision_justification.overall_assessment}
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Strengths */}
+                {analysis.decision_justification.strengths && analysis.decision_justification.strengths.length > 0 && (
+                  <div className="bg-white/80 rounded-lg border-2 border-emerald-200 p-4">
+                    <h4 className="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Strengths
+                    </h4>
+                    <ul className="space-y-2">
+                      {analysis.decision_justification.strengths.map((strength: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                          <span className="text-emerald-600 mt-0.5">✓</span>
+                          <span>{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Concerns */}
+                {analysis.decision_justification.concerns && analysis.decision_justification.concerns.length > 0 && (
+                  <div className="bg-white/80 rounded-lg border-2 border-rose-200 p-4">
+                    <h4 className="text-sm font-bold text-rose-800 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Concerns
+                    </h4>
+                    <ul className="space-y-2">
+                      {analysis.decision_justification.concerns.map((concern: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                          <span className="text-rose-600 mt-0.5">⚠</span>
+                          <span>{concern}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Key Reasons */}
+              {analysis.decision_justification.key_reasons && analysis.decision_justification.key_reasons.length > 0 && (
+                <div className="bg-white/80 rounded-lg border-2 border-slate-300 p-4">
+                  <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Key Reasons for {analysis.decision_justification.recommendation}
+                  </h4>
+                  <ul className="space-y-2">
+                    {analysis.decision_justification.key_reasons.map((reason: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                        <span className="font-bold text-slate-500">{idx + 1}.</span>
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

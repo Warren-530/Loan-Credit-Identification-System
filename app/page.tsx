@@ -19,11 +19,17 @@ import { api, type Application } from "@/lib/api"
 
 export default function Dashboard() {
   const [applications, setApplications] = useState<Application[]>([])
+  const [avgProcessingTime, setAvgProcessingTime] = useState<number>(0)
 
   const loadApplications = useCallback(async () => {
     try {
       const data = await api.getApplications()
       setApplications(data)
+      
+      // Fetch stats for processing time
+      const stats = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/applications/stats`)
+      const statsData = await stats.json()
+      setAvgProcessingTime(statsData.avg_processing_time || 0)
     } catch (error) {
       console.error("Failed to load applications:", error)
     }
@@ -83,7 +89,9 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">~5s</div>
+            <div className="text-2xl font-bold">
+              {avgProcessingTime > 0 ? `${avgProcessingTime.toFixed(1)}s` : 'N/A'}
+            </div>
             <p className="text-xs text-slate-500">AI analysis time</p>
           </CardContent>
         </Card>

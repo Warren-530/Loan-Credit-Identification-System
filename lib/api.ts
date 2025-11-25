@@ -10,6 +10,15 @@ export interface Application {
   score: number;
   status: string;
   date: string;
+  review_status?: string;
+  ai_decision?: string;
+  human_decision?: string;
+  requested_amount?: number;
+  loan_type?: string;
+  applicant_name?: string;
+  applicant_ic?: string;
+  application_id?: string;
+  created_at?: string;
 }
 
 export interface ApplicationDetail {
