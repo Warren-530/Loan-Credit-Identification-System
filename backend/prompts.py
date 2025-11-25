@@ -39,6 +39,59 @@ Output this information in the `applicant_profile` section with ALL extracted fi
 2. Identify the Loan Essay section and split it into sentences
 3. Build an ordered array of cleaned essay sentences
 
+### FINANCIAL METRICS CALCULATION (MANDATORY)
+
+You MUST calculate the following 6 financial metrics using data from the 4 documents:
+
+**1. DEBT SERVICE RATIO (DSR)**
+Formula: (Total Monthly Debt Commitments ÷ Net Monthly Income) × 100%
+- Extract existing commitments from Payslip deductions (PTPTN, Credit Card, Personal Loan)
+- Extract debt mentions from Essay
+- Calculate estimated new loan installment: Requested Amount ÷ Period (in months)
+- Sum all monthly debts and divide by net income from Payslip
+- Assessment: <40% = Low Risk, 40-60% = Moderate, >60% = High Risk
+
+**2. NET DISPOSABLE INCOME (NDI)**
+Formula: Net Monthly Income - Total Monthly Debt - Living Expenses
+- Net income from Payslip
+- Total debt from DSR calculation
+- Living expenses from Bank Statement (Grocery, Utilities, Misc)
+- Assessment: >RM2000 = Sufficient Buffer, RM1000-2000 = Tight, <RM1000 = Critical
+
+**3. LOAN-TO-VALUE RATIO (LTV)** [Car & Housing loans only]
+Formula: (Loan Amount ÷ Asset Value) × 100%
+- For Car Loan: Extract car price from Essay or Application Form
+- For Housing Loan: Extract property value from Essay or Application Form
+- Calculate: Loan Amount ÷ Asset Value × 100%
+- Assessment: Check against Malaysia standards (Car: max 90%, Housing: max 90%)
+- Set "applicable": false for Personal/Micro-Business loans
+
+**4. PER CAPITA INCOME**
+Formula: Net Monthly Income ÷ Family Members
+- Net monthly income from Payslip (Annual Income ÷ 12)
+- Family members from Application Form
+- Assessment: >RM2000 = Comfortable, RM1000-2000 = Moderate, <RM1000 = Struggling
+- Add risk_flag if per capita is low (<RM1000) even with good DSR
+
+**5. SAVINGS RATE**
+Formula: (Monthly Closing Balance ÷ Monthly Income) × 100%
+- Closing balance from Bank Statement last month
+- Monthly income from Bank Statement salary credit
+- Assessment: >50% = High Saver, 20-50% = Moderate, <20% = Low Saver
+
+**6. COST OF LIVING RATIO**
+Formula: (Total Living Expenses ÷ Net Income) × 100%
+- Extract living expenses from Bank Statement (Grocery, Dining, Shopping, Utilities)
+- Net income from Payslip
+- Assessment: <30% = Frugal, 30-50% = Moderate, >50% = High
+
+**IMPORTANT**: For all metrics, include:
+- Actual calculated value
+- Formatted percentage (where applicable)
+- Detailed calculation breakdown showing source numbers
+- Assessment category (Low/Medium/High risk)
+- Evidence quote from source documents
+
 ### RISK SCORING - COMPREHENSIVE MULTI-FACTOR ANALYSIS (0-100)
 
 **CRITICAL: This application is for {loan_type}. Apply loan-specific scoring criteria.**
@@ -304,6 +357,71 @@ Required structure:
     "bank_account": "string (from SAVING ACCOUNT field, if available)",
     "id": "string (Application ID for context isolation - REQUIRED)"
   },
+  "financial_metrics": {
+    "debt_service_ratio": {
+      "value": 0.0,
+      "percentage": "string (formatted as XX.X%)",
+      "calculation": {
+        "existing_commitments": 0.0,
+        "estimated_new_installment": 0.0,
+        "total_monthly_debt": 0.0,
+        "net_monthly_income": 0.0
+      },
+      "assessment": "Low Risk (<40%) | Moderate Risk (40-60%) | High Risk (>60%)",
+      "evidence": "string (quote from documents showing debt)"
+    },
+    "net_disposable_income": {
+      "value": 0.0,
+      "after_living_costs": 0.0,
+      "calculation": {
+        "net_income": 0.0,
+        "total_debt_commitments": 0.0,
+        "estimated_living_expenses": 0.0
+      },
+      "assessment": "Sufficient Buffer (>RM2000) | Tight (RM1000-2000) | Critical (<RM1000)",
+      "evidence": "string (quote from bank statement showing expenses)"
+    },
+    "loan_to_value_ratio": {
+      "value": 0.0,
+      "percentage": "string (formatted as XX.X%)",
+      "calculation": {
+        "loan_amount": 0.0,
+        "asset_value": 0.0,
+        "down_payment": 0.0
+      },
+      "assessment": "string (compliance with standards)",
+      "applicable": "boolean (true for Car/Housing loans only)"
+    },
+    "per_capita_income": {
+      "value": 0.0,
+      "calculation": {
+        "net_monthly_income": 0.0,
+        "family_members": 0
+      },
+      "assessment": "Comfortable (>RM2000) | Moderate (RM1000-2000) | Struggling (<RM1000)",
+      "risk_flag": "string (if per capita is low despite good DSR)"
+    },
+    "savings_rate": {
+      "value": 0.0,
+      "percentage": "string (formatted as XX.X%)",
+      "calculation": {
+        "monthly_closing_balance": 0.0,
+        "monthly_income": 0.0
+      },
+      "assessment": "High Saver (>50%) | Moderate (20-50%) | Low Saver (<20%)",
+      "evidence": "string (quote from bank statement)"
+    },
+    "cost_of_living_ratio": {
+      "value": 0.0,
+      "percentage": "string (formatted as XX.X%)",
+      "calculation": {
+        "total_living_expenses": 0.0,
+        "net_income": 0.0
+      },
+      "assessment": "Frugal (<30%) | Moderate (30-50%) | High (>50%)",
+      "evidence": "string (quote from bank statement showing expenses)"
+    }
+  },
   "risk_score_analysis": {
     "final_score": 0,
     "risk_level": "string",
@@ -349,13 +467,14 @@ Required structure:
 ```
 
 CRITICAL REQUIREMENTS:
-1. `essay_insights` array: MINIMUM 10 items
-2. `key_risk_flags` array: MINIMUM 4 items (MANDATORY)
-3. `risk_score_analysis.final_score`: Integer 0-100
-4. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
-5. All string values must be properly escaped (use \" for quotes inside strings)
-6. NO JavaScript comments in output
-7. All arrays must have at least 1 item (except behavioral_insights which is optional)
+1. `financial_metrics`: REQUIRED - must calculate all 6 metrics with evidence
+2. `essay_insights` array: MINIMUM 10 items
+3. `key_risk_flags` array: MINIMUM 4 items (MANDATORY)
+4. `risk_score_analysis.final_score`: Integer 0-100
+5. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
+6. All string values must be properly escaped (use \" for quotes inside strings)
+7. NO JavaScript comments in output
+8. All arrays must have at least 1 item (except behavioral_insights which is optional)
 
 ### STRICTNESS
 - If the bank statement lacks expense detail, DO NOT fabricate expense breakdown.

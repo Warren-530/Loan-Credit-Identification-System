@@ -172,6 +172,24 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   interface ForensicClaim { claim_topic: string; essay_quote: string; statement_evidence: string; status: string; confidence: number }
   interface BehavioralInsight { insight: string; category: string; evidence: string; reasoning: string }
   interface EssayInsight { insight: string; evidence_sentence: string; sentence_index: number; category: string; exact_quote: string }
+  interface FinancialMetric {
+    value: number;
+    percentage?: string;
+    calculation: Record<string, number | string>;
+    assessment: string;
+    evidence?: string;
+    applicable?: boolean;
+    risk_flag?: string;
+    after_living_costs?: number;
+  }
+  interface FinancialMetrics {
+    debt_service_ratio?: FinancialMetric;
+    net_disposable_income?: FinancialMetric;
+    loan_to_value_ratio?: FinancialMetric;
+    per_capita_income?: FinancialMetric;
+    savings_rate?: FinancialMetric;
+    cost_of_living_ratio?: FinancialMetric;
+  }
   interface FinancialDna {
     income_stability?: number;
     debt_servicing?: number;
@@ -181,6 +199,23 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     expense_breakdown?: { category: string; amount: string; percentage: string }[];
     income_consistency?: string;
     psycholinguistic_profile?: { tone: string; risk_indicator: string; markers: string[] };
+  }
+  interface ApplicantProfile {
+    name?: string;
+    ic_number?: string;
+    loan_type?: string;
+    requested_amount?: number;
+    annual_income?: number;
+    period?: string;
+    loan_purpose?: string[];
+    phone?: string;
+    email?: string;
+    address?: string;
+    birth_date?: string;
+    marital_status?: string;
+    family_members?: number;
+    bank_institution?: string;
+    bank_account?: string;
   }
   interface CombinedFinding { flag: string; description: string; type: 'Positive'|'Negative'|'Neutral'; exact_quote?: string }
   interface AnalysisResult {
@@ -193,7 +228,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     forensic_evidence?: { claim_vs_reality?: ForensicClaim[] };
     risk_score_analysis?: { final_score?: number; score_breakdown?: ScoreBreakdownItem[] };
     essay_insights?: EssayInsight[];
-    financial_dna?: FinancialDna | null; // legacy nullable
+    financial_dna?: FinancialDna | null;
+    financial_metrics?: FinancialMetrics;
+    applicant_profile?: ApplicantProfile;
     document_texts?: { bank_statement?: string; essay?: string; payslip?: string };
     cross_verification?: { claim_topic?: string; evidence_found?: string; status?: string };
     compliance_audit?: { bias_check?: string; source_of_wealth?: string };
@@ -343,8 +380,8 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.text(`Application ID: ${resolvedParams.id}`, 25, 68)
-      doc.text(`Loan Type: ${appData.loan_type}`, 25, 75)
-      doc.text(`Requested Amount: RM ${appData.requested_amount.toLocaleString()}`, 25, 82)
+      doc.text(`Loan Type: ${appData.loan_type || 'N/A'}`, 25, 75)
+      doc.text(`Requested Amount: ${appData.requested_amount ? `RM ${appData.requested_amount.toLocaleString()}` : 'N/A'}`, 25, 82)
       doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 130, 68)
       doc.text(`Status: ${appData.status}`, 130, 75)
       
@@ -543,20 +580,26 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 </Badge>
               </div>
               
-              {/* Metadata Badges Row */}
+              {/* Metadata Badges Row - Dynamic from Application Form */}
               <div className="flex items-center gap-3 mt-2">
-                <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
-                  <Banknote className="h-3 w-3 mr-1" />
-                  Requested: RM {appData.requested_amount.toLocaleString()}
-                </Badge>
-                <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  Tenure: {appData.loan_tenure_months || 24} Months
-                </Badge>
-                <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  Business: F&B (Retail)
-                </Badge>
+                {appData.requested_amount && (
+                  <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
+                    <Banknote className="h-3 w-3 mr-1" />
+                    Requested: RM {appData.requested_amount.toLocaleString()}
+                  </Badge>
+                )}
+                {analysis?.applicant_profile?.period && (
+                  <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    Tenure: {analysis.applicant_profile.period}
+                  </Badge>
+                )}
+                {analysis?.applicant_profile?.loan_type && (
+                  <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
+                    <Building2 className="h-3 w-3 mr-1" />
+                    {analysis.applicant_profile.loan_type}
+                  </Badge>
+                )}
               </div>
             </div>
             
@@ -605,30 +648,44 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                     </>
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="text-rose-600 border-rose-300 hover:bg-rose-50"
-                  onClick={() => handleDecisionClick('Rejected')}
-                >
-                  Reject
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  className="text-slate-700 bg-slate-100 hover:bg-slate-200"
-                  onClick={() => handleDecisionClick('Review Required')}
-                >
-                  Request Info
-                </Button>
-                <Button 
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => handleDecisionClick('Approved')}
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Approve
-                </Button>
+                
+                {/* Manual Decision Override Buttons - Underwriter Control */}
+                <div className="border-l border-slate-300 pl-2 flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-rose-600 border-rose-300 hover:bg-rose-50"
+                    onClick={() => handleDecisionClick('Rejected')}
+                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                  >
+                    <AlertTriangle className="mr-1 h-3 w-3" />
+                    Reject
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                    onClick={() => handleDecisionClick('Review Required')}
+                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                  >
+                    <AlertCircle className="mr-1 h-3 w-3" />
+                    Review
+                  </Button>
+                  <Button 
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => handleDecisionClick('Approved')}
+                    disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                  >
+                    <CheckCircle className="mr-1 h-3 w-3" />
+                    Approve
+                  </Button>
+                </div>
+                
                 {appData.status === 'Failed' && (
                   <Button 
                     variant="outline" 
+                    size="sm"
                     className="text-orange-600 border-orange-300 hover:bg-orange-50"
                     onClick={handleRetry}
                   >
@@ -792,6 +849,251 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             </div>
           </CardContent>
         </Card>
+
+        {/* Financial Metrics Section - Comprehensive Analysis */}
+        {analysis && analysis.financial_metrics && Object.keys(analysis.financial_metrics).length > 0 && (
+          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-slate-900 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-purple-600" />
+                Financial Metrics Analysis
+              </CardTitle>
+              <CardDescription>Comprehensive financial ratios and indicators calculated from documents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Debt Service Ratio (DSR) */}
+                {analysis.financial_metrics.debt_service_ratio && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Debt Service Ratio (DSR)</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.debt_service_ratio.value < 40 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        analysis.financial_metrics.debt_service_ratio.value < 60 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.debt_service_ratio.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-purple-700 mb-2">
+                      {analysis.financial_metrics.debt_service_ratio.percentage || `${analysis.financial_metrics.debt_service_ratio.value.toFixed(1)}%`}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: (Total Monthly Debt ÷ Net Income) × 100%</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Existing: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.existing_commitments || 0).toLocaleString()}</p>
+                        <p>New Loan: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.estimated_new_installment || 0).toLocaleString()}</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          Total: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.total_monthly_debt || 0).toLocaleString()}
+                        </p>
+                        <p className="mt-1">Net Income: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.net_monthly_income || 0).toLocaleString()}</p>
+                      </div>
+                      {analysis.financial_metrics.debt_service_ratio.evidence && (
+                        <p className="italic text-slate-500 mt-2 text-[10px]">
+                          💡 &ldquo;{analysis.financial_metrics.debt_service_ratio.evidence.substring(0, 80)}...&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Net Disposable Income */}
+                {analysis.financial_metrics.net_disposable_income && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Net Disposable Income</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.net_disposable_income.value > 2000 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        analysis.financial_metrics.net_disposable_income.value > 1000 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.net_disposable_income.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-emerald-700 mb-2">
+                      RM {analysis.financial_metrics.net_disposable_income.value.toLocaleString()}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: Net Income - Total Debt - Living Expenses</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Income: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.net_income || 0).toLocaleString()}</p>
+                        <p>- Debt: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.total_debt_commitments || 0).toLocaleString()}</p>
+                        <p>- Living: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.estimated_living_expenses || 0).toLocaleString()}</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          = RM {analysis.financial_metrics.net_disposable_income.value.toLocaleString()}
+                        </p>
+                      </div>
+                      {analysis.financial_metrics.net_disposable_income.after_living_costs && (
+                        <p className="text-blue-600 font-medium mt-2">
+                          💰 Real Buffer: RM {analysis.financial_metrics.net_disposable_income.after_living_costs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Per Capita Income */}
+                {analysis.financial_metrics.per_capita_income && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Per Capita Income</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.per_capita_income.value > 2000 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        analysis.financial_metrics.per_capita_income.value > 1000 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.per_capita_income.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-blue-700 mb-2">
+                      RM {analysis.financial_metrics.per_capita_income.value.toLocaleString()}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: Net Monthly Income ÷ Family Members</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Income: RM {Number(analysis.financial_metrics.per_capita_income.calculation.net_monthly_income || 0).toLocaleString()}/month</p>
+                        <p>Family: {Number(analysis.financial_metrics.per_capita_income.calculation.family_members || 1)} members</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          = RM {analysis.financial_metrics.per_capita_income.value.toLocaleString()}/person
+                        </p>
+                      </div>
+                      {analysis.financial_metrics.per_capita_income.risk_flag && (
+                        <Alert className="mt-2 bg-amber-50 border-amber-300">
+                          <AlertTriangle className="h-3 w-3 text-amber-600" />
+                          <AlertDescription className="text-[10px] text-amber-800">
+                            {analysis.financial_metrics.per_capita_income.risk_flag}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Savings Rate */}
+                {analysis.financial_metrics.savings_rate && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Savings Rate</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.savings_rate.value > 50 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        analysis.financial_metrics.savings_rate.value > 20 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.savings_rate.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-green-700 mb-2">
+                      {analysis.financial_metrics.savings_rate.percentage || `${analysis.financial_metrics.savings_rate.value.toFixed(1)}%`}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: (Closing Balance ÷ Monthly Income) × 100%</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Closing: RM {Number(analysis.financial_metrics.savings_rate.calculation.monthly_closing_balance || 0).toLocaleString()}</p>
+                        <p>Income: RM {Number(analysis.financial_metrics.savings_rate.calculation.monthly_income || 0).toLocaleString()}</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          Rate: {analysis.financial_metrics.savings_rate.percentage || `${analysis.financial_metrics.savings_rate.value.toFixed(1)}%`}
+                        </p>
+                      </div>
+                      {analysis.financial_metrics.savings_rate.evidence && (
+                        <p className="italic text-slate-500 mt-2 text-[10px]">
+                          💡 &ldquo;{analysis.financial_metrics.savings_rate.evidence.substring(0, 80)}...&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cost of Living Ratio */}
+                {analysis.financial_metrics.cost_of_living_ratio && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Cost of Living Ratio</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.cost_of_living_ratio.value < 30 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        analysis.financial_metrics.cost_of_living_ratio.value < 50 ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.cost_of_living_ratio.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-indigo-700 mb-2">
+                      {analysis.financial_metrics.cost_of_living_ratio.percentage || `${analysis.financial_metrics.cost_of_living_ratio.value.toFixed(1)}%`}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: (Living Expenses ÷ Net Income) × 100%</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Expenses: RM {Number(analysis.financial_metrics.cost_of_living_ratio.calculation.total_living_expenses || 0).toLocaleString()}</p>
+                        <p>Income: RM {Number(analysis.financial_metrics.cost_of_living_ratio.calculation.net_income || 0).toLocaleString()}</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          Ratio: {analysis.financial_metrics.cost_of_living_ratio.percentage || `${analysis.financial_metrics.cost_of_living_ratio.value.toFixed(1)}%`}
+                        </p>
+                      </div>
+                      {analysis.financial_metrics.cost_of_living_ratio.evidence && (
+                        <p className="italic text-slate-500 mt-2 text-[10px]">
+                          💡 &ldquo;{analysis.financial_metrics.cost_of_living_ratio.evidence.substring(0, 80)}...&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Loan-to-Value Ratio (for Car/Housing loans only) */}
+                {analysis.financial_metrics.loan_to_value_ratio?.applicable && (
+                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-900">Loan-to-Value Ratio (LTV)</h4>
+                      <Badge className={`${
+                        analysis.financial_metrics.loan_to_value_ratio.value <= 90 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        'bg-rose-100 text-rose-800 border-rose-300'
+                      }`}>
+                        {analysis.financial_metrics.loan_to_value_ratio.assessment}
+                      </Badge>
+                    </div>
+                    <p className="text-3xl font-bold text-orange-700 mb-2">
+                      {analysis.financial_metrics.loan_to_value_ratio.percentage || `${analysis.financial_metrics.loan_to_value_ratio.value.toFixed(1)}%`}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>📊 Formula: (Loan Amount ÷ Asset Value) × 100%</p>
+                      <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
+                        <p>Loan: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.loan_amount || 0).toLocaleString()}</p>
+                        <p>Asset: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.asset_value || 0).toLocaleString()}</p>
+                        <p>Down: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.down_payment || 0).toLocaleString()}</p>
+                        <p className="font-bold border-t border-slate-300 pt-1 mt-1">
+                          LTV: {analysis.financial_metrics.loan_to_value_ratio.percentage || `${analysis.financial_metrics.loan_to_value_ratio.value.toFixed(1)}%`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Metric Explanations */}
+              <div className="mt-4 p-4 bg-white/50 rounded-lg border border-purple-200">
+                <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase">Understanding Financial Metrics</h4>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
+                  <div>
+                    <span className="font-semibold">DSR (Debt Service Ratio):</span> Measures repayment pressure. Bank warning at 60-70%.
+                  </div>
+                  <div>
+                    <span className="font-semibold">NDI (Net Disposable Income):</span> Cash left after debts. Shows emergency buffer capacity.
+                  </div>
+                  <div>
+                    <span className="font-semibold">Per Capita Income:</span> Income per family member. Reveals hidden financial stress.
+                  </div>
+                  <div>
+                    <span className="font-semibold">Savings Rate:</span> Closing balance vs income. Indicates financial discipline.
+                  </div>
+                  <div>
+                    <span className="font-semibold">Cost of Living:</span> Living expenses as % of income. Shows spending patterns.
+                  </div>
+                  <div>
+                    <span className="font-semibold">LTV (Loan-to-Value):</span> For Car/Housing loans. Malaysia standard max 90%.
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Risk Factors (key_risk_flags only) */}
         <Card>

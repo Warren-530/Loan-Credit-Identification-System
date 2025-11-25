@@ -95,7 +95,10 @@ async def get_applications(limit: int = 50):
             {
                 "id": app.application_id,
                 "name": app.applicant_name or "Unknown",
-                "type": app.loan_type or "N/A",
+                "type": (
+                    app.analysis_result.get("applicant_profile", {}).get("loan_type") 
+                    if app.analysis_result else None
+                ) or (app.loan_type.value if hasattr(app.loan_type, 'value') else app.loan_type) or "N/A",
                 "amount": f"RM {app.requested_amount:,.0f}" if app.requested_amount else "N/A",
                 "score": app.risk_score or 0,
                 "status": app.final_decision if app.status == ApplicationStatus.APPROVED else app.status,

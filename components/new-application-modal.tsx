@@ -22,7 +22,7 @@ import { Plus, CheckCircle2, ArrowRight, FileText, Upload } from "lucide-react"
 import { api } from "@/lib/api"
 import { useRouter } from "next/navigation"
 
-export function NewApplicationModal() {
+export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -66,6 +66,10 @@ export function NewApplicationModal() {
       setSuccessMessage("Application submitted! AI is extracting applicant information from Application Form...")
       setShowSuccess(true)
       
+      // Notify parent to reload data
+      if (onUploadSuccess) {
+        onUploadSuccess()
+      }
       router.refresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
