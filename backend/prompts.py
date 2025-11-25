@@ -15,50 +15,32 @@ You will receive data wrapped in XML tags for clear document boundaries:
 - `<bank_statement>`: Transaction history
 - `<loan_essay>`: Narrative explanation
 
-### CRITICAL AUDITING RULES (Zero Hallucination)
+### CRITICAL AUDITING RULES (Universal Logic)
+
 1. **Source of Truth Hierarchy**: 
    - Bank Statement (Reality) > Payslip (Official) > Essay (Claims) > Application Form (Self-Reported)
    - Always prioritize actual transaction evidence over narrative claims
 
-2. **Employment vs Business (Business Viability Analysis)**:
-   - For Micro-Business Loan: Focus on analyzing whether the business has viable income potential
-   - Business Tenure: ONLY count if `<loan_essay>` explicitly mentions "operating business", "running shop", "started business"
-   - Do NOT credit "Years of Employment" (from payslip) as "Business Tenure"
-   - Cross-check: Does the payslip salary align with business revenue patterns in bank statement?
-   - If applicant has employment income, analyze if it's SUPPLEMENTARY or PRIMARY income source
+2. **Payroll Logic & Fraud Detection (Crucial)**:
+   - **EPF Calculation Rule**: EPF is typically 11% of **GROSS Income** (Basic Salary + Fixed Allowances), NOT just Basic Salary. Do not flag "Calculation Error" if EPF is higher than 11% of Basic; check against Gross first.
+   - **Net Pay Reality Check**: Bank Statement "Salary Credit" MUST match the **Net Pay** (after deductions) on the Payslip. 
+     - **RED FLAG**: If Bank Deposit Amount == Payslip **Gross Pay**, FLAG immediately as "Payroll Anomaly: Bank credit matches Gross Pay (should be Net). Possible document fabrication or non-compliance."
 
-3. **Luxury Spending (Strict Whitelist)**:
-   - **IS LUXURY**: Louis Vuitton, LV, Gucci, Hermès, Rolex, Cartier, Fine Dining >RM200/meal, Clubbing/Lounge, 4-5 Star Hotels (Mandarin Oriental, Ritz-Carlton)
-   - **NOT LUXURY**: Uniqlo, H&M, Padini, KFC, McDonald's, Starbucks, Shell, Petronas, Watson, Guardian, Tesco, Lotus, 99 Speedmart, AEON, Giant
-   - ONLY flag if specific luxury merchant names appear OR "Miscellaneous" >30% of net income
-   - Do NOT flag: Grocery, utilities, regular dining <RM50, basic shopping
+3. **Employment vs Business**:
+   - If Loan Type = "Micro-Business" but applicant provides an **Employment Payslip**, FLAG as "Income Source Mismatch".
+   - Do not calculate "Business Tenure" based on "Years of Employment".
 
-4. **Math Validation (Fraud Detection)**:
-   - **Payslip Integrity**: Check if (Basic Salary + Allowances - EPF - SOCSO - Tax) = Net Pay. If not, add to `fraud_flags`
-   - **EPF Rate Calculation**: 
-     - EPF is calculated on **Gross Salary** (Basic + Fixed Allowances), NOT just Basic Salary.
-     - Formula: `(Basic Salary + Fixed Allowances) * 11%`.
-     - Allow variance of ±RM50 to account for rounding or non-fixed allowances.
-     - ONLY flag "Payslip Math Error" if the variance is significant (>RM50).
-   - **Bank Balance Continuity**: Check if (Opening Balance + Credits - Debits) ≈ Closing Balance. If off by >RM100, flag as "Bank Statement Inconsistency"
-   - **Income Verification**: Net Pay (payslip) should match (Annual Income ÷ 12) from Application Form within ±10%
-   - **Gross vs Net Anomaly**: 
-     - Check if the Salary Credit in Bank Statement matches the **Gross Pay** from Payslip.
-     - If Bank Credit == Gross Pay (instead of Net Pay), flag as "Anomaly: Bank credit matches Gross Pay".
-     - Real salary deposits must be Net Pay (after deductions).
+4. **Math Validation Strategy (Raw Data First)**:
+   - LLMs are bad at division. **Extract RAW values** for Python to calculate ratios later.
+   - **Savings Rate Logic**: Do not look at just one closing balance. Look at the trend: `(Total Monthly Credits - Total Monthly Debits)`. Positive means saving; negative means overspending.
+   - **DSR Logic**: Ensure the "Net Monthly Income" used for DSR is the **Net Pay** from Payslip, not Gross.
 
-5. **DSR & Financial Metrics Calculation**:
-   - **DSR (Debt Service Ratio)**: 
-     - Formula: `(Total Monthly Commitments / Net Disposable Income) * 100`
-     - **Net Disposable Income**: Use **Net Pay** from Payslip (NOT Gross Pay, NOT Annual Income/12).
-     - **Commitments**: Sum of all loan repayments found in Bank Statement + Payslip Deductions (excluding EPF/SOCSO/Tax).
-   - **Savings Rate**:
-     - Formula: `((Total Credits - Total Debits) / Total Credits) * 100`
-     - **Closing Balance**: Do NOT just take the first line. Calculate: `Opening Balance + Total Credits - Total Debits`.
-     - If calculated Closing Balance differs from stated Closing Balance, trust the calculated one.
-     - Ensure Savings Rate is < 100% (unless 0 expenses found).
+5. **Luxury Spending (Strict Whitelist)**:
+   - **IS LUXURY**: LV, Gucci, Rolex, Fine Dining >RM200, 5-Star Hotels.
+   - **NOT LUXURY**: Uniqlo, KFC, Shell, Watson, Tesco, 99 Speedmart.
+   - Only flag if "Miscellaneous" > 30% of Net Income.
 
-5. **Document Isolation**: 
+6. **Document Isolation**: 
    - Context Scope: **Application ID: {id}** ONLY
    - NEVER mix information between applications
    - Each XML tag contains data for THIS applicant only
