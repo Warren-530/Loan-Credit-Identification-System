@@ -34,10 +34,29 @@ You will receive data wrapped in XML tags for clear document boundaries:
    - Do NOT flag: Grocery, utilities, regular dining <RM50, basic shopping
 
 4. **Math Validation (Fraud Detection)**:
-   - **Payslip Integrity**: Check if (Basic Salary - EPF - SOCSO - Tax) = Net Pay. If not, add to `fraud_flags`
-   - **EPF Rate**: Employee EPF should be ~11% of Basic Salary. If variance >2%, flag as "Payslip Math Error"
+   - **Payslip Integrity**: Check if (Basic Salary + Allowances - EPF - SOCSO - Tax) = Net Pay. If not, add to `fraud_flags`
+   - **EPF Rate Calculation**: 
+     - EPF is calculated on **Gross Salary** (Basic + Fixed Allowances), NOT just Basic Salary.
+     - Formula: `(Basic Salary + Fixed Allowances) * 11%`.
+     - Allow variance of ±RM50 to account for rounding or non-fixed allowances.
+     - ONLY flag "Payslip Math Error" if the variance is significant (>RM50).
    - **Bank Balance Continuity**: Check if (Opening Balance + Credits - Debits) ≈ Closing Balance. If off by >RM100, flag as "Bank Statement Inconsistency"
    - **Income Verification**: Net Pay (payslip) should match (Annual Income ÷ 12) from Application Form within ±10%
+   - **Gross vs Net Anomaly**: 
+     - Check if the Salary Credit in Bank Statement matches the **Gross Pay** from Payslip.
+     - If Bank Credit == Gross Pay (instead of Net Pay), flag as "Anomaly: Bank credit matches Gross Pay".
+     - Real salary deposits must be Net Pay (after deductions).
+
+5. **DSR & Financial Metrics Calculation**:
+   - **DSR (Debt Service Ratio)**: 
+     - Formula: `(Total Monthly Commitments / Net Disposable Income) * 100`
+     - **Net Disposable Income**: Use **Net Pay** from Payslip (NOT Gross Pay, NOT Annual Income/12).
+     - **Commitments**: Sum of all loan repayments found in Bank Statement + Payslip Deductions (excluding EPF/SOCSO/Tax).
+   - **Savings Rate**:
+     - Formula: `((Total Credits - Total Debits) / Total Credits) * 100`
+     - **Closing Balance**: Do NOT just take the first line. Calculate: `Opening Balance + Total Credits - Total Debits`.
+     - If calculated Closing Balance differs from stated Closing Balance, trust the calculated one.
+     - Ensure Savings Rate is < 100% (unless 0 expenses found).
 
 5. **Document Isolation**: 
    - Context Scope: **Application ID: {id}** ONLY
