@@ -582,7 +582,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               
               {/* Metadata Badges Row - Dynamic from Application Form */}
               <div className="flex items-center gap-3 mt-2">
-                {appData.requested_amount && (
+                {appData.requested_amount && typeof appData.requested_amount === 'number' && (
                   <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
                     <Banknote className="h-3 w-3 mr-1" />
                     Requested: RM {appData.requested_amount.toLocaleString()}
@@ -876,10 +876,10 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-purple-700 mb-2">
-                      {analysis.financial_metrics.debt_service_ratio.percentage || `${analysis.financial_metrics.debt_service_ratio.value.toFixed(1)}%`}
+                      {analysis.financial_metrics.debt_service_ratio.percentage || `${(analysis.financial_metrics.debt_service_ratio.value ?? 0).toFixed(1)}%`}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: (Total Monthly Debt ÷ Net Income) × 100%</p>
+                      <p className="font-semibold">Formula: (Total Monthly Debt ÷ Net Income) × 100%</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Existing: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.existing_commitments || 0).toLocaleString()}</p>
                         <p>New Loan: RM {Number(analysis.financial_metrics.debt_service_ratio.calculation.estimated_new_installment || 0).toLocaleString()}</p>
@@ -890,7 +890,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </div>
                       {analysis.financial_metrics.debt_service_ratio.evidence && (
                         <p className="italic text-slate-500 mt-2 text-[10px]">
-                          💡 &ldquo;{analysis.financial_metrics.debt_service_ratio.evidence.substring(0, 80)}...&rdquo;
+                          Evidence: &ldquo;{(analysis.financial_metrics.debt_service_ratio.evidence || '').substring(0, 80)}...&rdquo;
                         </p>
                       )}
                     </div>
@@ -911,21 +911,21 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-emerald-700 mb-2">
-                      RM {analysis.financial_metrics.net_disposable_income.value.toLocaleString()}
+                      RM {(analysis.financial_metrics.net_disposable_income.value ?? 0).toLocaleString()}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: Net Income - Total Debt - Living Expenses</p>
+                      <p className="font-semibold">Formula: Net Income - Total Debt - Living Expenses</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Income: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.net_income || 0).toLocaleString()}</p>
                         <p>- Debt: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.total_debt_commitments || 0).toLocaleString()}</p>
                         <p>- Living: RM {Number(analysis.financial_metrics.net_disposable_income.calculation.estimated_living_expenses || 0).toLocaleString()}</p>
                         <p className="font-bold border-t border-slate-300 pt-1 mt-1">
-                          = RM {analysis.financial_metrics.net_disposable_income.value.toLocaleString()}
+                          = RM {(analysis.financial_metrics.net_disposable_income.value ?? 0).toLocaleString()}
                         </p>
                       </div>
                       {analysis.financial_metrics.net_disposable_income.after_living_costs && (
                         <p className="text-blue-600 font-medium mt-2">
-                          💰 Real Buffer: RM {analysis.financial_metrics.net_disposable_income.after_living_costs.toLocaleString()}
+                          Real Buffer: RM {(analysis.financial_metrics.net_disposable_income.after_living_costs ?? 0).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -946,15 +946,15 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-blue-700 mb-2">
-                      RM {analysis.financial_metrics.per_capita_income.value.toLocaleString()}
+                      RM {(analysis.financial_metrics.per_capita_income.value ?? 0).toLocaleString()}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: Net Monthly Income ÷ Family Members</p>
+                      <p className="font-semibold">Formula: Net Monthly Income ÷ Family Members</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Income: RM {Number(analysis.financial_metrics.per_capita_income.calculation.net_monthly_income || 0).toLocaleString()}/month</p>
                         <p>Family: {Number(analysis.financial_metrics.per_capita_income.calculation.family_members || 1)} members</p>
                         <p className="font-bold border-t border-slate-300 pt-1 mt-1">
-                          = RM {analysis.financial_metrics.per_capita_income.value.toLocaleString()}/person
+                          = RM {(analysis.financial_metrics.per_capita_income.value ?? 0).toLocaleString()}/person
                         </p>
                       </div>
                       {analysis.financial_metrics.per_capita_income.risk_flag && (
@@ -983,20 +983,20 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-green-700 mb-2">
-                      {analysis.financial_metrics.savings_rate.percentage || `${analysis.financial_metrics.savings_rate.value.toFixed(1)}%`}
+                      {analysis.financial_metrics.savings_rate.percentage || `${(analysis.financial_metrics.savings_rate.value ?? 0).toFixed(1)}%`}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: (Closing Balance ÷ Monthly Income) × 100%</p>
+                      <p className="font-semibold">Formula: (Closing Balance ÷ Monthly Income) × 100%</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Closing: RM {Number(analysis.financial_metrics.savings_rate.calculation.monthly_closing_balance || 0).toLocaleString()}</p>
                         <p>Income: RM {Number(analysis.financial_metrics.savings_rate.calculation.monthly_income || 0).toLocaleString()}</p>
                         <p className="font-bold border-t border-slate-300 pt-1 mt-1">
-                          Rate: {analysis.financial_metrics.savings_rate.percentage || `${analysis.financial_metrics.savings_rate.value.toFixed(1)}%`}
+                          Rate: {analysis.financial_metrics.savings_rate.percentage || `${(analysis.financial_metrics.savings_rate.value ?? 0).toFixed(1)}%`}
                         </p>
                       </div>
                       {analysis.financial_metrics.savings_rate.evidence && (
                         <p className="italic text-slate-500 mt-2 text-[10px]">
-                          💡 &ldquo;{analysis.financial_metrics.savings_rate.evidence.substring(0, 80)}...&rdquo;
+                          Evidence: &ldquo;{(analysis.financial_metrics.savings_rate.evidence || '').substring(0, 80)}...&rdquo;
                         </p>
                       )}
                     </div>
@@ -1017,20 +1017,20 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-indigo-700 mb-2">
-                      {analysis.financial_metrics.cost_of_living_ratio.percentage || `${analysis.financial_metrics.cost_of_living_ratio.value.toFixed(1)}%`}
+                      {analysis.financial_metrics.cost_of_living_ratio.percentage || `${(analysis.financial_metrics.cost_of_living_ratio.value ?? 0).toFixed(1)}%`}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: (Living Expenses ÷ Net Income) × 100%</p>
+                      <p className="font-semibold">Formula: (Living Expenses ÷ Net Income) × 100%</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Expenses: RM {Number(analysis.financial_metrics.cost_of_living_ratio.calculation.total_living_expenses || 0).toLocaleString()}</p>
                         <p>Income: RM {Number(analysis.financial_metrics.cost_of_living_ratio.calculation.net_income || 0).toLocaleString()}</p>
                         <p className="font-bold border-t border-slate-300 pt-1 mt-1">
-                          Ratio: {analysis.financial_metrics.cost_of_living_ratio.percentage || `${analysis.financial_metrics.cost_of_living_ratio.value.toFixed(1)}%`}
+                          Ratio: {analysis.financial_metrics.cost_of_living_ratio.percentage || `${(analysis.financial_metrics.cost_of_living_ratio.value ?? 0).toFixed(1)}%`}
                         </p>
                       </div>
                       {analysis.financial_metrics.cost_of_living_ratio.evidence && (
                         <p className="italic text-slate-500 mt-2 text-[10px]">
-                          💡 &ldquo;{analysis.financial_metrics.cost_of_living_ratio.evidence.substring(0, 80)}...&rdquo;
+                          Evidence: &ldquo;{(analysis.financial_metrics.cost_of_living_ratio.evidence || '').substring(0, 80)}...&rdquo;
                         </p>
                       )}
                     </div>
@@ -1050,16 +1050,16 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                       </Badge>
                     </div>
                     <p className="text-3xl font-bold text-orange-700 mb-2">
-                      {analysis.financial_metrics.loan_to_value_ratio.percentage || `${analysis.financial_metrics.loan_to_value_ratio.value.toFixed(1)}%`}
+                      {analysis.financial_metrics.loan_to_value_ratio.percentage || `${(analysis.financial_metrics.loan_to_value_ratio.value ?? 0).toFixed(1)}%`}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
-                      <p>📊 Formula: (Loan Amount ÷ Asset Value) × 100%</p>
+                      <p className="font-semibold">Formula: (Loan Amount ÷ Asset Value) × 100%</p>
                       <div className="bg-slate-50 rounded p-2 mt-2 font-mono text-[10px]">
                         <p>Loan: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.loan_amount || 0).toLocaleString()}</p>
                         <p>Asset: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.asset_value || 0).toLocaleString()}</p>
                         <p>Down: RM {Number(analysis.financial_metrics.loan_to_value_ratio.calculation.down_payment || 0).toLocaleString()}</p>
                         <p className="font-bold border-t border-slate-300 pt-1 mt-1">
-                          LTV: {analysis.financial_metrics.loan_to_value_ratio.percentage || `${analysis.financial_metrics.loan_to_value_ratio.value.toFixed(1)}%`}
+                          LTV: {analysis.financial_metrics.loan_to_value_ratio.percentage || `${(analysis.financial_metrics.loan_to_value_ratio.value ?? 0).toFixed(1)}%`}
                         </p>
                       </div>
                     </div>
@@ -1275,50 +1275,32 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         </Card>
 
 
-        <div className="space-y-4">
-          {/* Document Viewer Controls */}
-          <Card className="border bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Source Documents</CardTitle>
-              <CardDescription className="text-xs">Toggle between original PDFs and extracted text</CardDescription>
+        {/* AI Summary Section */}
+        {analysis && analysis.ai_summary && (
+          <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-slate-900 flex items-center gap-2">
+                <Bot className="h-5 w-5 text-indigo-600" />
+                AI Applicant Summary
+              </CardTitle>
+              <CardDescription>Comprehensive analysis based on all 4 uploaded documents</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {(['bank','essay','payslip'] as const).map(t => (
-                  <Button key={t} size="sm" variant={docViewMode===t? 'default':'outline'} onClick={()=>setDocViewMode(t)}>
-                    {t==='bank'? 'Bank Statement': t==='essay'? 'Loan Essay':'Payslip'}
-                  </Button>
-                ))}
-                <Button size="sm" variant={showPdf? 'default':'outline'} onClick={()=>setShowPdf(p=>!p)}>
-                  {showPdf? 'Show Text':'Show PDF'}
-                </Button>
-                <input
-                  value={searchTerm}
-                  onChange={e=>setSearchTerm(e.target.value)}
-                  placeholder="Search text..."
-                  className="ml-2 flex-1 min-w-[140px] rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div ref={documentViewerRef} className="max-h-[320px] overflow-auto rounded border bg-slate-950 text-slate-100 p-3 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                {!showPdf && (highlightedDocument || 'No text')}
-                {showPdf && (
-                  <div className="bg-white text-slate-800 rounded p-2">
-                    {currentFileUrl ? (
-                      <iframe
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${currentFileUrl}`}
-                        className="w-full h-[300px] border rounded"
-                        title="Document PDF"
-                      />
-                    ) : (
-                      <p className="text-xs text-slate-500">No PDF available for this document.</p>
-                    )}
-                    <p className="text-[10px] italic mt-2">Basic PDF embed. Upgrade to pdf.js for coordinate-based sentence highlights.</p>
-                  </div>
-                )}
+            <CardContent>
+              <div className="bg-white rounded-lg border border-indigo-200 p-4">
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {analysis.ai_summary}
+                  </p>
+                </div>
+                <div className="mt-4 pt-4 border-t border-indigo-200">
+                  <p className="text-xs text-slate-500">
+                    This summary is generated by AI after analyzing: Application Form, Bank Statement, Loan Essay, and Payslip
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
+        )}
 
         {crossVerification && crossVerification.status && (
           <Card>

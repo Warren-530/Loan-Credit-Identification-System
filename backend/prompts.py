@@ -34,6 +34,29 @@ From the "=== APPLICATION FORM ===" section, extract:
 
 Output this information in the `applicant_profile` section with ALL extracted fields.
 
+### FORENSIC CROSS-DOCUMENT VERIFICATION (MANDATORY - MINIMUM 5 COMPARISONS)
+
+**CRITICAL**: You MUST generate at least 5 detailed claim-vs-reality comparisons by cross-referencing the Loan Essay against Bank Statement, Payslip, and Application Form.
+
+**Comparison Framework:**
+1. **Income Claims**: Essay mentions income → verify with Payslip salary + Bank deposits + Application Form income
+2. **Debt Claims**: Essay mentions existing loans → verify with Payslip deductions + Bank Statement payments
+3. **Spending Claims**: Essay claims frugal lifestyle → verify with Bank Statement transactions
+4. **Employment Claims**: Essay mentions job/business → verify with Payslip employer + Bank Statement income patterns
+5. **Financial Situation**: Essay describes financial status → verify with Bank Statement balances + transaction patterns
+
+**Each comparison MUST include:**
+- `claim_topic`: Specific aspect being verified (e.g., "Monthly Salary Claim", "Existing Debt Burden")
+- `essay_quote`: Exact verbatim quote from the essay making the claim
+- `statement_evidence`: Evidence found in Bank Statement (transactions, balances, patterns)
+- `payslip_evidence`: Evidence from Payslip (if applicable)
+- `application_form_evidence`: Evidence from Application Form (if applicable)
+- `status`: "Verified" (claim matches evidence), "Contradicted" (claim conflicts), "Inconclusive" (insufficient evidence)
+- `confidence`: 0-100 (how confident you are in this verification)
+- `ai_justification`: Explain the significance of this verification for credit risk
+
+**ISOLATION RULE**: Only use documents from Application ID: {id}. Never mix information from different applications.
+
 ### DATA PREPARATION
 1. Reconstruct broken words (depo\nsit -> deposit) and merge wrapped lines
 2. Identify the Loan Essay section and split it into sentences
@@ -289,10 +312,10 @@ You MUST output **at least 10** distinct insights derived ONLY from the essay se
 
 **Important:** Do NOT mix insights between different applications - each analysis must be unique to THIS applicant's essay only.
 
-### KEY RISK FLAGS (CRITICAL REQUIREMENT - EXACTLY 4+ RISKS MANDATORY)
-**YOU MUST OUTPUT A MINIMUM OF 4 RISK FLAGS. THIS IS NON-NEGOTIABLE.**
+### KEY RISK FLAGS (CRITICAL REQUIREMENT - MINIMUM 8 RISKS MANDATORY)
+**YOU MUST OUTPUT A MINIMUM OF 8 RISK FLAGS. THIS IS NON-NEGOTIABLE.**
 
-Perform deep forensic analysis of ALL FOUR documents (Application Form, Bank Statement, Loan Essay, Payslip) and identify AT LEAST 4 distinct risk factors.
+Perform deep forensic analysis of ALL FOUR documents (Application Form, Bank Statement, Loan Essay, Payslip) and identify AT LEAST 8 distinct risk factors with granular detail.
 
 Each risk flag MUST include ALL these fields:
 - `flag`: Clear, specific risk title
@@ -318,20 +341,21 @@ Each risk flag MUST include ALL these fields:
    - Lack of business expense evidence
    - Employment gaps or job-hopping
 
-**INSTRUCTIONS FOR GENERATING 4+ RISKS:**
-- Start by identifying the most obvious high-severity risks
-- Then find medium-severity concerns from essay analysis
-- Look for subtle red flags in spending patterns
-- Identify any inconsistencies or missing verifications
+**INSTRUCTIONS FOR GENERATING 8+ RISKS:**
+- Start by identifying 2-3 high-severity risks with clear evidence
+- Add 3-4 medium-severity concerns from cross-document analysis
+- Include 2-3 low-severity observations or potential risks
+- Look for subtle red flags in spending patterns and inconsistencies
+- Check for missing verifications or documentation gaps
 - Even "good" applications have areas of concern - find them!
 
-**EXAMPLE FRAMEWORK:**
-Risk 1: Existing debt mentioned in essay (PTPTN, credit cards, etc.)
-Risk 2: Income affordability concern or irregular income pattern
-Risk 3: Spending behavior issue or cashflow struggle mentioned
-Risk 4: Trustworthiness concern (claim vs. reality mismatch) OR repayment capability concern
+**REQUIRED FRAMEWORK (MINIMUM 8):**
+Risk 1-2: High severity - Existing debt, income instability, or affordability issues
+Risk 3-4: Medium severity - Spending patterns, family burden, or employment concerns  
+Risk 5-6: Cross-document inconsistencies or verification gaps
+Risk 7-8: Low severity - Potential future risks, documentation completeness, or behavioral patterns
 
-**ABSOLUTE RULE:** The `key_risk_flags` array MUST contain at least 4 objects. If you output fewer than 4, the analysis is invalid and will be rejected.
+**ABSOLUTE RULE:** The `key_risk_flags` array MUST contain at least 8 objects with detailed evidence. If you output fewer than 8, the analysis is invalid and will be rejected.
 
 ### OUTPUT JSON (STRICT, NO MARKDOWN)
 Output ONLY valid JSON with NO comments, NO markdown code blocks, NO extra text.
@@ -437,14 +461,18 @@ Required structure:
   "forensic_evidence": {
     "claim_vs_reality": [
       {
-        "claim_topic": "string",
-        "essay_quote": "string",
-        "statement_evidence": "string",
+        "claim_topic": "string (specific claim from essay)",
+        "essay_quote": "string (exact quote from Loan Essay)",
+        "statement_evidence": "string (evidence from Bank Statement)",
+        "payslip_evidence": "string (evidence from Payslip, if applicable)",
+        "application_form_evidence": "string (evidence from Application Form, if applicable)",
         "status": "Verified or Contradicted or Inconclusive",
-        "confidence": 0
+        "confidence": 0,
+        "ai_justification": "string (explain why this verification matters)"
       }
     ]
   },
+  "ai_summary": "string (200-300 words comprehensive summary of applicant's financial profile, strengths, weaknesses, and recommendation based on all 4 documents)",
   "essay_insights": [
     {
       "insight": "string",
@@ -469,12 +497,35 @@ Required structure:
 CRITICAL REQUIREMENTS:
 1. `financial_metrics`: REQUIRED - must calculate all 6 metrics with evidence
 2. `essay_insights` array: MINIMUM 10 items
-3. `key_risk_flags` array: MINIMUM 4 items (MANDATORY)
-4. `risk_score_analysis.final_score`: Integer 0-100
-5. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
-6. All string values must be properly escaped (use \" for quotes inside strings)
-7. NO JavaScript comments in output
-8. All arrays must have at least 1 item (except behavioral_insights which is optional)
+3. `key_risk_flags` array: MINIMUM 8 items (MANDATORY - INCREASED)
+4. `forensic_evidence.claim_vs_reality` array: MINIMUM 5 items comparing essay claims to all documents
+5. `ai_summary`: REQUIRED - 200-300 word comprehensive analysis
+6. `risk_score_analysis.final_score`: Integer 0-100
+7. `risk_score_analysis.risk_level`: Must be EXACTLY "Low", "Medium", or "High"
+8. All string values must be properly escaped (use \" for quotes inside strings)
+9. NO JavaScript comments in output
+10. All arrays must have minimum items as specified
+
+### AI SUMMARY GENERATION (MANDATORY)
+
+You MUST generate a comprehensive `ai_summary` (200-300 words) that synthesizes insights from all 4 documents:
+
+**Structure:**
+1. **Applicant Overview** (2-3 sentences): Name, loan type, amount, employment, family situation
+2. **Financial Strengths** (3-4 sentences): Positive findings from analysis (income stability, savings, low debt, etc.)
+3. **Risk Concerns** (3-4 sentences): Key weaknesses or red flags identified
+4. **Cross-Document Verification** (2-3 sentences): Consistency of information across documents
+5. **Recommendation** (2-3 sentences): Clear stance on approval with conditions or concerns
+
+**Writing Style:**
+- Professional, objective tone
+- Use specific numbers and evidence
+- Reference all 4 documents
+- Avoid generic statements
+- Focus on credit risk implications
+
+**Example Opening:**
+"This analysis evaluates [Name]'s application for a [Loan Type] of RM [Amount]. The applicant is employed as [Job] with a monthly salary of RM [X] supporting [Y] family members. Cross-verification across Application Form, Payslip, Bank Statement, and Loan Essay reveals..."
 
 ### STRICTNESS
 - If the bank statement lacks expense detail, DO NOT fabricate expense breakdown.
