@@ -20,24 +20,33 @@ class AIEngine:
     
     def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "") -> Dict[str, Any]:
         """
-        Analyze loan application using Gemini AI
+        Analyze loan application using Gemini AI with XML-structured prompts for zero hallucination.
         
         Args:
-            application_form_text: Extracted text from Application Form PDF (for applicant info extraction)
-            raw_text: Combined text from all 4 documents
-            bank_text: Extracted bank statement text for display
-            essay_text: Extracted essay text for display
-            payslip_text: Extracted payslip text for display
+            application_form_text: Extracted text from Application Form PDF
+            raw_text: Combined text from all 4 documents (DEPRECATED - will split internally)
+            bank_text: Extracted bank statement text
+            essay_text: Extracted essay text
+            payslip_text: Extracted payslip text (may be empty for Micro-Business)
             application_id: Unique application ID for context isolation
             
         Returns:
             Analysis result as dictionary with applicant_profile and document_texts attached
         """
         try:
-            # Build the prompt with application ID for context and application form
-            print(f"[AI ENGINE] Building prompt for {application_id}, text length: {len(raw_text)}")
-            prompt = build_prompt(application_form_text, raw_text, application_id)
-            print(f"[AI ENGINE] Prompt built, length: {len(prompt)} characters")
+            # Build the prompt with XML structure for clear document boundaries
+            print(f"[AI ENGINE] Building XML-structured prompt for {application_id}")
+            print(f"[AI ENGINE] Document lengths - Form: {len(application_form_text)}, Bank: {len(bank_text)}, Essay: {len(essay_text)}, Payslip: {len(payslip_text)}")
+            
+            # Use new XML-based prompt builder
+            prompt = build_prompt(
+                application_form_text=application_form_text,
+                payslip_text=payslip_text,
+                bank_statement_text=bank_text,
+                essay_text=essay_text,
+                application_id=application_id
+            )
+            print(f"[AI ENGINE] XML prompt built, length: {len(prompt)} characters")
             
             # Call Gemini API with retry logic for rate limits
             print(f"[AI ENGINE] Initializing Gemini model: {self.model_name}")
