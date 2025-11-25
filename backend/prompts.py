@@ -52,32 +52,75 @@ You MUST output **at least 10** distinct insights derived ONLY from the essay se
 **Important:** Do NOT mix insights between different applications - each analysis must be unique to THIS applicant's essay only.
 Never merge two sentences; never paraphrase inside `exact_quote`.
 
-### KEY RISK FLAGS (MANDATORY - MINIMUM 4 REQUIRED)
-You MUST output **at least 4** detailed risk flags after deep analysis of ALL THREE documents (Bank Statement, Loan Essay, Payslip).
-Each risk flag MUST include:
-- `flag`: Clear risk title (e.g., "Existing Debt Obligations Disclosed", "Insufficient Income Evidence", "Suspicious Spending Pattern")
+### KEY RISK FLAGS (CRITICAL REQUIREMENT - EXACTLY 4+ RISKS MANDATORY)
+**YOU MUST OUTPUT A MINIMUM OF 4 RISK FLAGS. THIS IS NON-NEGOTIABLE.**
+
+Perform deep forensic analysis of ALL THREE documents (Bank Statement, Loan Essay, Payslip) and identify AT LEAST 4 distinct risk factors or concerns.
+
+Each risk flag MUST include ALL these fields:
+- `flag`: Clear, specific risk title (e.g., "Existing PTPTN Debt Disclosed", "Credit Card Arrears Mentioned", "Irregular Income Pattern", "Vague Repayment Strategy")
 - `severity`: "High" | "Medium" | "Low"
-- `description`: Detailed explanation of the risk and its credit implications (2-3 sentences minimum)
-- `evidence_quote`: Exact verbatim quote from the document proving this risk exists
-- `ai_justification`: Why this matters for loan approval decision (1-2 sentences)
+- `description`: Detailed explanation of the risk and its credit implications (minimum 2-3 sentences explaining WHY this is concerning)
+- `evidence_quote`: Exact verbatim quote from the document proving this risk exists (MUST be actual text from document)
+- `ai_justification`: Clear explanation of why this matters for loan approval decision (1-2 sentences)
 - `document_source`: "Bank Statement" | "Loan Essay" | "Payslip"
 
-**Risk Categories to Analyze:**
-1. **Debt & Financial Obligations:** PTPTN, existing loans, credit cards, informal debts, monthly commitments mentioned in essay or seen in bank statement
-2. **Income Stability & Affordability:** Income fluctuations, low balance warnings, income vs. expense ratio, ability to service new loan
-3. **Spending Behavior Risks:** Gambling, excessive luxury spending, overdrafts, frequent cash withdrawals, round-tripping
-4. **Trustworthiness & Consistency:** Essay claims vs. bank statement reality, missing information, vague explanations, purpose mismatches
-5. **Repayment Capability:** Unrealistic repayment plans, extended tenure requests, thin savings buffer, irregular income patterns
-6. **Business/Employment Risks:** (If applicable) Business expense verification, employment stability, gig work irregularity
+**MANDATORY ANALYSIS AREAS - Find risks from these categories:**
+1. **Debt & Financial Obligations:** 
+   - PTPTN loans mentioned in essay
+   - Credit card debts or arrears mentioned
+   - Any existing loan commitments
+   - Monthly installment obligations
+   - Informal debts to family/friends
 
-**CRITICAL:** Even if the application seems good, find at least 4 potential risks or areas of concern. Look deeper into:
-- Essay mentions of financial struggles, even if phrased positively
-- Bank statement patterns that suggest tight cashflow
-- Any debt obligations mentioned anywhere
-- Income sufficiency for the requested loan amount
-- Repayment plan realism
+2. **Income Stability & Affordability:**
+   - Income vs. requested loan amount ratio
+   - Irregular salary deposits in bank statement
+   - Low account balances
+   - Insufficient buffer for emergencies
+   - Debt-to-income ratio concerns
 
-Do NOT skip this section. Do NOT output generic placeholder risks. Each risk must be specific to THIS application with real evidence quotes.
+3. **Spending Behavior Risks:**
+   - Gambling transactions (Genting, 4D, Magnum)
+   - Excessive luxury spending
+   - Overdraft incidents
+   - Frequent large cash withdrawals
+   - High-risk crypto trading
+
+4. **Trustworthiness & Consistency:**
+   - Essay claims contradicting bank statement
+   - Loan purpose mismatch (e.g., business loan but essay mentions personal use)
+   - Vague or unrealistic explanations
+   - Missing critical information
+   - Inconsistencies between documents
+
+5. **Repayment Capability Concerns:**
+   - Unrealistic repayment timeline
+   - Extended tenure requests (red flag for affordability issues)
+   - Thin or negative savings
+   - No clear income source for repayment
+   - Cashflow struggles mentioned in essay
+
+6. **Business/Employment Risks:**
+   - Unstable gig work without regular income
+   - New business without proven track record
+   - Lack of business expense evidence
+   - Employment gaps or job-hopping
+
+**INSTRUCTIONS FOR GENERATING 4+ RISKS:**
+- Start by identifying the most obvious high-severity risks
+- Then find medium-severity concerns from essay analysis
+- Look for subtle red flags in spending patterns
+- Identify any inconsistencies or missing verifications
+- Even "good" applications have areas of concern - find them!
+
+**EXAMPLE FRAMEWORK:**
+Risk 1: Existing debt mentioned in essay (PTPTN, credit cards, etc.)
+Risk 2: Income affordability concern or irregular income pattern
+Risk 3: Spending behavior issue or cashflow struggle mentioned
+Risk 4: Trustworthiness concern (claim vs. reality mismatch) OR repayment capability concern
+
+**ABSOLUTE RULE:** The `key_risk_flags` array MUST contain at least 4 objects. If you output fewer than 4, the analysis is invalid and will be rejected.
 
 ### OUTPUT JSON (STRICT, NO MARKDOWN)
 {
@@ -118,22 +161,38 @@ Do NOT skip this section. Do NOT output generic placeholder risks. Each risk mus
   ],
   "key_risk_flags": [
     {
-      "flag": "Existing Debt Obligations Disclosed",
+      "flag": "Existing PTPTN Debt Disclosed",
       "severity": "Medium",
-      "description": "Applicant mentions existing PTPTN student loan obligation which will impact debt servicing ratio. This recurring commitment reduces available income for new loan repayment and increases overall credit exposure.",
-      "evidence_quote": "Essay states: '00: • PTPTN Student Loan: RM 180'",
+      "description": "Applicant mentions existing PTPTN student loan obligation of RM180/month which will impact debt servicing ratio. This recurring commitment reduces available income for new loan repayment and increases overall credit exposure.",
+      "evidence_quote": "Essay states: 'PTPTN Student Loan: RM 180'",
       "ai_justification": "Existing debt obligations directly affect loan affordability and increase default risk if income is insufficient to cover all commitments.",
       "document_source": "Loan Essay"
     },
     {
-      "flag": "Income Verification Needed",
+      "flag": "Credit Card Arrears Mentioned",
       "severity": "High",
-      "description": "No clear recurring salary deposits visible in bank statement to verify claimed income level. Irregular deposit patterns make it difficult to assess true repayment capacity.",
-      "evidence_quote": "Bank statement shows sporadic transfers without consistent monthly salary pattern",
-      "ai_justification": "Without verified stable income, the risk of default increases significantly as repayment capability cannot be confirmed.",
-      "document_source": "Bank Statement"
+      "description": "Applicant discloses being 3 months in arrears on credit card payments with maxed out cards totaling RM35,000. This indicates severe cashflow issues and inability to manage existing credit obligations.",
+      "evidence_quote": "Essay states: 'Currently in 3 months arrears due to cash flow issues • Credit Card: My previous minimum payment of RM 150/month is now irrelevant, as I have maxed out three credit cards totaling RM 35,000'",
+      "ai_justification": "Active arrears and maxed credit cards are strong indicators of financial distress and significantly increase probability of default on new loan.",
+      "document_source": "Loan Essay"
+    },
+    {
+      "flag": "Loan Purpose Mismatch - Critical",
+      "severity": "High",
+      "description": "Application is for a business loan but essay reveals the true purpose is personal use (car/vehicle purchase) with funds intended for debt consolidation. This misrepresentation raises serious trustworthiness concerns.",
+      "evidence_quote": "Essay states: '00/month (Currently in 3 months arrears due to cash flow issues • Credit Card' - indicating personal debt issues despite business loan application",
+      "ai_justification": "Purpose misrepresentation violates lending guidelines and suggests applicant may be attempting to circumvent proper loan classification and risk assessment.",
+      "document_source": "Loan Essay"
+    },
+    {
+      "flag": "Thin Financial Buffer",
+      "severity": "Medium",
+      "description": "Bank statement or essay indicates minimal savings buffer with cashflow struggles mentioned. Applicant lacks emergency fund to handle unexpected expenses during loan repayment period.",
+      "evidence_quote": "Essay mentions 'cash flow issues' and arrears situation",
+      "ai_justification": "Absence of financial buffer increases vulnerability to default if income is disrupted or unexpected expenses arise during loan tenure.",
+      "document_source": "Loan Essay"
     }
-    // Minimum 4 risk flags required - analyze deeper to find more potential risks
+    // CRITICAL: Must have minimum 4 risk flags. Add more if additional risks found.
   ],
   "ai_reasoning_log": ["[00:01] Parsed essay into N sentences", "[00:02] Scoring adjustments applied", "[00:03] Generated 8+ essay insights"]
 }
