@@ -70,7 +70,7 @@ class Application(SQLModel, table=True):
     analysis_result: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     
     # Decision Audit History (JSON array)
-    decision_history: Optional[List[dict]] = Field(default=None, sa_column=Column(JSON))
+    decision_history: Optional[List[dict]] = Field(default_factory=list, sa_column=Column(JSON))
 
 
 class AnalysisCache(SQLModel, table=True):

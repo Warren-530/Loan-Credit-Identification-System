@@ -113,7 +113,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   
   const submitDecision = async (decision: string, reason: string | null) => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/verify`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,8 +123,12 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         })
       })
       
+      const result = await response.json()
+      console.log('Decision submitted, response:', result)
+      
       // Reload application data
       const data = await api.getApplication(resolvedParams.id)
+      console.log('Reloaded app data, decision_history:', data.decision_history)
       setAppData(data)
       setShowOverrideDialog(false)
       setOverrideReason('')
@@ -717,16 +721,6 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 >
                   <AlertTriangle className="mr-1 h-3 w-3" />
                   Reject
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                  onClick={() => handleDecisionClick('Review Required')}
-                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                >
-                  <AlertCircle className="mr-1 h-3 w-3" />
-                  Review
                 </Button>
                 <Button 
                   size="sm"

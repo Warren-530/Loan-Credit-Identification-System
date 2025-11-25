@@ -5,6 +5,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTa
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from typing import Optional, List
 import os
 import shutil
@@ -13,6 +14,7 @@ from pathlib import Path
 import asyncio
 from dotenv import load_dotenv
 import pytesseract
+from sqlalchemy.orm.attributes import flag_modified
 
 from models import Application, ApplicationStatus, LoanType, RiskLevel, ReviewStatus, AnalysisCache
 from database import init_db, get_session
@@ -663,13 +665,17 @@ async def upload_batch(
 
 ## Duplicate status endpoint removed (using the lightweight polling version above)
 
+# Pydantic model for verify request
+class VerifyRequest(BaseModel):
+    decision: str
+    reviewer_name: str = Config().DEFAULT_REVIEWER
+    override_reason: Optional[str] = None
+
 
 @app.post("/api/application/{application_id}/verify")
 async def verify_application(
     application_id: str,
-    decision: str,
-    reviewer_name: str = Config().DEFAULT_REVIEWER,
-    override_reason: Optional[str] = None
+    request: VerifyRequest
 ):
     """Human verification/override of AI decision"""
     with get_session() as session:
@@ -679,46 +685,58 @@ async def verify_application(
             raise HTTPException(status_code=404, detail="Application not found")
         
         # Determine if this is an override
-        is_override = app.ai_decision and decision != app.ai_decision
+        is_override = app.ai_decision and request.decision != app.ai_decision
         
         # Update verification fields
-        app.human_decision = decision
-        app.final_decision = decision
-        app.reviewed_by = reviewer_name
+        app.human_decision = request.decision
+        app.final_decision = request.decision
+        app.reviewed_by = request.reviewer_name
         app.reviewed_at = datetime.utcnow()
         app.review_status = ReviewStatus.MANUAL_OVERRIDE if is_override else ReviewStatus.HUMAN_VERIFIED
         
         # Update status based on decision
-        if decision == 'Approved':
+        if request.decision == 'Approved':
             app.status = ApplicationStatus.APPROVED
-        elif decision == 'Rejected':
+        elif request.decision == 'Rejected':
             app.status = ApplicationStatus.REJECTED
         else:  # Review Required
             app.status = ApplicationStatus.COMPLETED  # Keep as completed but flagged for review
         
-        if is_override and override_reason:
-            app.override_reason = override_reason
+        if is_override and request.override_reason:
+            app.override_reason = request.override_reason
         
-        # Add to decision history
-        if not app.decision_history:
+        # Add to decision history (ensure it's properly tracked as modified)
+        # Initialize as empty list if None (for existing records)
+        if app.decision_history is None:
             app.decision_history = []
         
-        app.decision_history.append({
+        new_entry = {
             "timestamp": datetime.utcnow().isoformat(),
-            "actor": reviewer_name,
-            "action": f"Changed decision to '{decision}'",
-            "details": f"Override" if is_override else "Verified AI decision",
-            "reason": override_reason
-        })
+            "actor": request.reviewer_name,
+            "action": f"Changed decision to '{request.decision}'",
+            "details": "Override" if is_override else "Verified AI decision",
+            "reason": request.override_reason
+        }
+        
+        # Create a new list to ensure SQLAlchemy detects the change
+        app.decision_history = app.decision_history + [new_entry]
+        
+        # Mark the JSON column as modified so SQLAlchemy knows to update it
+        flag_modified(app, "decision_history")
         
         app.updated_at = datetime.utcnow()
         session.add(app)
         session.commit()
+        session.refresh(app)
+        
+        print(f"DEBUG: Decision history after commit: {app.decision_history}")
+        print(f"DEBUG: Number of entries: {len(app.decision_history) if app.decision_history else 0}")
         
         return {
             "success": True,
             "review_status": app.review_status,
-            "is_override": is_override
+            "is_override": is_override,
+            "decision_history": app.decision_history
         }
 
 
