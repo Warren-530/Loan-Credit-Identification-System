@@ -1661,3 +1661,115 @@ async def get_reasoning_subset(application_id: str):
             "essay_insights_count": len(analysis.get("essay_insights", [])),
             "reasoning_log": analysis.get("ai_reasoning_log", [])[:20]
         }
+
+
+# Pydantic model for copilot chat request
+class CopilotRequest(BaseModel):
+    question: str
+    application_id: str
+
+
+@app.post("/api/copilot/ask")
+async def copilot_ask(request: CopilotRequest):
+    """AI Copilot endpoint - answers questions about specific application's 4 documents"""
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == request.application_id).first()
+        
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        if not app.analysis_result:
+            return {
+                "answer": "This application hasn't been analyzed yet. Please wait for the AI analysis to complete.",
+                "sources": []
+            }
+        
+        # Get document texts from analysis
+        analysis = app.analysis_result
+        doc_texts = analysis.get("document_texts", {})
+        applicant_profile = analysis.get("applicant_profile", {})
+        
+        # Build context from the 4 documents
+        context_parts = []
+        context_parts.append(f"=== APPLICATION ID: {request.application_id} ===")
+        context_parts.append(f"Applicant: {applicant_profile.get('name', 'Unknown')}")
+        context_parts.append(f"Loan Type: {applicant_profile.get('loan_type', 'Unknown')}")
+        context_parts.append(f"Requested Amount: RM {applicant_profile.get('requested_amount', 0):,.2f}")
+        context_parts.append("")
+        context_parts.append("=== BANK STATEMENT ===")
+        context_parts.append(doc_texts.get("bank_statement", "No bank statement available")[:3000])
+        context_parts.append("")
+        context_parts.append("=== LOAN ESSAY ===")
+        context_parts.append(doc_texts.get("essay", "No essay available")[:2000])
+        context_parts.append("")
+        context_parts.append("=== PAYSLIP ===")
+        context_parts.append(doc_texts.get("payslip", "No payslip available")[:2000])
+        context_parts.append("")
+        context_parts.append("=== ANALYSIS SUMMARY ===")
+        context_parts.append(f"Risk Score: {analysis.get('risk_score', 'N/A')}/100")
+        context_parts.append(f"Final Decision: {analysis.get('final_decision', 'N/A')}")
+        
+        # Add key findings
+        if analysis.get("key_risk_flags"):
+            context_parts.append("\nKey Risk Flags:")
+            for flag in analysis.get("key_risk_flags", [])[:5]:
+                context_parts.append(f"- {flag.get('flag', '')}: {flag.get('description', '')}")
+        
+        context = "\n".join(context_parts)
+        
+        # Call Gemini to answer the question
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("models/gemini-2.0-flash")
+            
+            copilot_prompt = f"""You are TrustLens Copilot, an AI assistant helping a Credit Officer review loan applications.
+
+CRITICAL: You are ONLY analyzing Application ID: {request.application_id}. Do NOT mix information from other applications.
+
+You have access to the following documents for this specific applicant:
+1. Application Form
+2. Bank Statement  
+3. Loan Essay
+4. Payslip
+
+{context}
+
+User Question: {request.question}
+
+Instructions:
+1. Answer ONLY based on the documents provided above for Application ID: {request.application_id}
+2. Quote specific evidence from the documents when possible
+3. If the answer isn't in the documents, say "I don't have that information in the available documents"
+4. Be concise and helpful
+5. Reference which document you're citing (e.g., "According to the Bank Statement...")
+
+Answer:"""
+            
+            response = model.generate_content(copilot_prompt)
+            answer = response.text
+            
+            # Extract sources mentioned in the answer
+            sources = []
+            if "Bank Statement" in answer or "bank statement" in answer:
+                sources.append("Bank Statement")
+            if "Essay" in answer or "essay" in answer or "Loan Essay" in answer:
+                sources.append("Loan Essay")
+            if "Payslip" in answer or "payslip" in answer:
+                sources.append("Payslip")
+            if "Application" in answer or "application form" in answer:
+                sources.append("Application Form")
+            
+            return {
+                "answer": answer,
+                "sources": list(set(sources)),
+                "application_id": request.application_id
+            }
+            
+        except Exception as e:
+            print(f"Copilot error: {str(e)}")
+            return {
+                "answer": f"I encountered an error while processing your question. Please try again.",
+                "sources": [],
+                "error": str(e)
+            }

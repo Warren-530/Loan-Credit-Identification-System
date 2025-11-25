@@ -1469,7 +1469,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         <div className="p-2 border-t bg-slate-50 text-[10px] text-slate-500 text-center">Evidence-only analysis. Text extraction hidden per user request.</div>
       </div>
 
-      <AICopilot />
+      <AICopilot applicationId={resolvedParams.id} />
       
       {/* Override Reason Dialog */}
       <Dialog open={showOverrideDialog} onOpenChange={setShowOverrideDialog}>
