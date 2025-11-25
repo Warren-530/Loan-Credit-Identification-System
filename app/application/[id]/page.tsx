@@ -32,6 +32,41 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [showPdf, setShowPdf] = useState(false)
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [isPolling, setIsPolling] = useState(false)
+  
+  // Resizable Split View State
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50) // percentage
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
+    
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+    
+    // Limit width between 20% and 80%
+    if (newLeftWidth >= 20 && newLeftWidth <= 80) {
+      setLeftPanelWidth(newLeftWidth)
+    }
+  }, [])
+
+  const onMouseUp = useCallback(() => {
+    setIsDragging(false)
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [onMouseMove])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [onMouseMove, onMouseUp])
 
   // Navigation helper (stable)
   const navigateApplication = useCallback((direction: 'previous' | 'next') => {
@@ -747,9 +782,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6">
+    <div ref={containerRef} className="flex h-[calc(100vh-8rem)] gap-0 relative select-none">
       {/* Left Panel: AI Analysis */}
-      <div className="w-1/2 flex flex-col space-y-6 overflow-y-auto pr-2">
+      <div className="flex flex-col space-y-6 overflow-y-auto pr-4" style={{ width: `${leftPanelWidth}%` }}>
         {/* Enhanced Header with Context Layer */}
         <div className="space-y-3">
           <div className="flex items-start justify-between">
@@ -916,9 +951,6 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium text-slate-600 min-w-[60px] text-center">
-                  {currentPosition} of {totalApplications}
-                </span>
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -1426,7 +1458,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             </CardContent>
-          </Card>
+                   </Card>
         )}
 
         {/* Risk Factors (key_risk_flags only) */}
@@ -1699,8 +1731,16 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         </Card>
       </div>
 
+      {/* Resizable Handle */}
+      <div
+        className="w-4 cursor-col-resize flex items-center justify-center hover:bg-slate-100 active:bg-blue-100 transition-colors z-10"
+        onMouseDown={handleMouseDown}
+      >
+        <div className="w-1 h-8 bg-slate-300 rounded-full" />
+      </div>
+
       {/* Right Panel: PDF Viewer Only */}
-      <div className="w-1/2 bg-white rounded-lg border border-slate-300 flex flex-col">
+      <div className="bg-white rounded-lg border border-slate-300 flex flex-col" style={{ width: `${100 - leftPanelWidth}%` }}>
         <div className="flex items-center gap-2 p-3 border-b bg-slate-50">
           {(['application_form','bank','essay','payslip'] as const).map(mode => (
             <Button key={mode} size="sm" variant={docViewMode===mode? 'default':'outline'} onClick={()=>setDocViewMode(mode)}>
