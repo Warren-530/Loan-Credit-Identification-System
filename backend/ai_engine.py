@@ -8,6 +8,9 @@ from typing import Dict, Any
 import google.generativeai as genai
 from google.api_core import exceptions
 from prompts import build_prompt
+import pypdfium2 as pdfium
+from PIL import Image
+import io
 
 
 class AIEngine:
@@ -18,7 +21,7 @@ class AIEngine:
         self.model_name = "models/gemini-2.0-flash"
         self.max_retries = 3
     
-    def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "") -> Dict[str, Any]:
+    def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "", application_form_path: str = None) -> Dict[str, Any]:
         """
         Analyze loan application using Gemini AI with XML-structured prompts for zero hallucination.
         
@@ -29,10 +32,15 @@ class AIEngine:
             essay_text: Extracted essay text
             payslip_text: Extracted payslip text (may be empty for Micro-Business)
             application_id: Unique application ID for context isolation
+            application_form_path: Path to Application Form PDF (for Vision analysis)
             
         Returns:
             Analysis result as dictionary with applicant_profile and document_texts attached
         """
+        if application_form_path:
+            print(f"[AI ENGINE] Switching to Vision Analysis for {application_id}")
+            return self.analyze_application_with_vision(application_form_path, bank_text, essay_text, payslip_text, application_id)
+
         try:
             # Build the prompt with XML structure for clear document boundaries
             print(f"[AI ENGINE] Building XML-structured prompt for {application_id}")
@@ -321,4 +329,70 @@ class AIEngine:
             print(f"Full error details: {str(e)}")
             if 'result_text' in locals():
                 print(f"Raw AI response (first 500 chars): {result_text[:500]}")
+            raise
+        
+    def analyze_application_with_vision(self, application_form_path: str, bank_text: str, essay_text: str, payslip_text: str, application_id: str) -> Dict[str, Any]:
+        """
+        Multimodal analysis:
+        1. Convert Application Form PDF (Page 1) -> Image
+        2. Send Image + Text Prompts to Gemini 2.0 Flash
+        """
+        print(f"[AI ENGINE] Starting Multimodal Vision Analysis for {application_id}")
+        
+        # 1. Convert PDF Page 1 to Image
+        try:
+            pdf = pdfium.PdfDocument(application_form_path)
+            page = pdf[0]  # Load first page
+            bitmap = page.render(scale=2.0)  # Render at 2x scale for better quality
+            pil_image = bitmap.to_pil()
+            print(f"[AI ENGINE] Converted Application Form Page 1 to Image: {pil_image.size}")
+        except Exception as e:
+            print(f"[ERROR] Failed to convert PDF to Image: {e}")
+            # Fallback to text-only if image conversion fails
+            return self.analyze_application("", "", bank_text, essay_text, payslip_text, application_id)
+
+        # 2. Build Prompt (Text Part)
+        # We pass empty application_form_text because the image replaces it
+        prompt_text = build_prompt(
+            application_form_text="(SEE ATTACHED IMAGE FOR APPLICATION FORM)",
+            payslip_text=payslip_text,
+            bank_statement_text=bank_text,
+            essay_text=essay_text,
+            application_id=application_id
+        )
+
+        # 3. Call Gemini with Image + Text
+        print(f"[AI ENGINE] Initializing Gemini model: {self.model_name}")
+        model = genai.GenerativeModel(self.model_name)
+        
+        response = None
+        for attempt in range(self.max_retries):
+            try:
+                print(f"[AI ENGINE] Calling Gemini API with Vision (attempt {attempt + 1}/{self.max_retries})...")
+                # Pass list: [prompt_text, image]
+                response = model.generate_content([prompt_text, pil_image])
+                print(f"[AI ENGINE] Gemini API call completed successfully")
+                break
+            except exceptions.ResourceExhausted as e:
+                if attempt < self.max_retries - 1:
+                    wait_time = 10 * (attempt + 1)
+                    print(f"[AI ENGINE] Rate limit hit. Waiting {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+        # 4. Process Response (Same as text-only)
+        result_text = response.text.strip()
+        # Remove markdown code blocks
+        result_text = re.sub(r'^```json\s*', '', result_text)
+        result_text = re.sub(r'\s*```$', '', result_text)
+        result_text = result_text.strip()
+
+        try:
+            result = json.loads(result_text)
+            print(f"[DEBUG] JSON parsed successfully")
+            return result
+        except json.JSONDecodeError as json_err:
+            print(f"[ERROR] JSON Parse Failed: {json_err}")
+            print(f"[ERROR] Full response:\n{result_text}")
             raise

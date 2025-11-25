@@ -359,7 +359,8 @@ async def process_application_background(
                         bank_text, 
                         essay_text, 
                         payslip_text, 
-                        application_id
+                        application_id,
+                        application_form_path=application_form_path
                     )
                     print("✓ AI analysis completed (Gemini)")
                     cache = AnalysisCache(application_id=application_id, result_json=result)
