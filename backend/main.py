@@ -41,10 +41,14 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Initialize AI Engine
 GEMINI_API_KEY = os.getenv(AIConfig.GEMINI_API_KEY_ENV)
 if not GEMINI_API_KEY:
-    print("WARNING: GEMINI_API_KEY not set. AI analysis will fail.")
+    print("❌ WARNING: GEMINI_API_KEY not set. AI analysis will fail.")
+    print("   Using FALLBACK mode with rule-based analysis")
     ai_engine = None
 else:
     ai_engine = AIEngine(GEMINI_API_KEY)
+    print("✅ AI Engine initialized successfully!")
+    print(f"   Model: {ai_engine.model_name}")
+    print(f"   API Key: {GEMINI_API_KEY[:20]}...")
 
 
 @app.on_event("startup")

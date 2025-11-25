@@ -13,7 +13,7 @@ timeout /t 2 /nobreak >nul
 echo.
 echo Starting Backend Server (Port 8000)...
 cd /d "%~dp0backend"
-start "TrustLens Backend" cmd /k "venv\Scripts\activate && python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+start "TrustLens Backend" cmd /k "venv\Scripts\activate && set GEMINI_API_KEY=AIzaSyBlaCbeTEyjptrl_YMJircDlOzLGg_D-mk && python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
 
 timeout /t 3 /nobreak >nul
 
