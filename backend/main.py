@@ -960,24 +960,8 @@ def extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_sc
                     })
             except:
                 pass
-        else:
-            # Cannot verify salary
-            if "image format" in payslip_lower or "document content detected" in payslip_lower:
-                risk_flags.append({
-                    "flag": "Income Amount Not Extractable",
-                    "severity": "High",
-                    "description": "Payslip in image format - unable to verify exact salary amount",
-                    "evidence_quote": "Payslip provided as scanned image. Manual income verification required.",
-                    "document_source": "Payslip"
-                })
-            else:
-                risk_flags.append({
-                    "flag": "Income Verification Failed",
-                    "severity": "High",
-                    "description": "Unable to locate salary amount in payslip document",
-                    "evidence_quote": "No clear salary figure found in payslip. Manual review needed.",
-                    "document_source": "Payslip"
-                })
+        # Note: Income extraction failures are not flagged as risks - they require manual verification only
+    
         
         # Check for existing debt deductions
         deduction_keywords = ['loan deduction', 'ptptn', 'housing loan', 'car loan', 'personal loan', 'court order', 'garnishment', 'debt recovery', 'repayment']
@@ -1173,23 +1157,10 @@ def extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_sc
             "document_source": "Loan Essay"
         })
     
-    # === 4. DOCUMENT COMPLETENESS CHECK ===
-    provided_docs = []
-    if bank_text and len(bank_text.strip()) > 50: provided_docs.append("Bank Statement")
-    if essay_text and len(essay_text.strip()) > 50: provided_docs.append("Loan Essay")
-    if payslip_text and len(payslip_text.strip()) > 50: provided_docs.append("Payslip")
-    
-    if len(provided_docs) < 3:
-        missing = [doc for doc in ["Bank Statement", "Loan Essay", "Payslip"] if doc not in provided_docs]
-        risk_flags.append({
-            "flag": "Incomplete Documentation",
-            "severity": "High",
-            "description": f"Missing required documents: {', '.join(missing)}",
-            "evidence_quote": f"Provided: {', '.join(provided_docs)} | Missing: {', '.join(missing)}",
-            "document_source": "Document Verification"
-        })
+    # Note: Document completeness is verified during upload, not flagged as a credit risk
     
     return risk_flags
+
 
 
 def generate_mock_result(

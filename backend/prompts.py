@@ -32,12 +32,24 @@ Clamp final score 0..100.
 Compare major intent claims in the essay (e.g., purpose, repayment plan, source of funds) with any matching numeric or keyword evidence in bank text. Output one object per validated/contradicted claim.
 
 ### ESSAY INSIGHTS (MANDATORY)
-You MUST output **at least 8** distinct insights derived ONLY from the essay sentences. For each:
-- `insight`: Concise title (e.g., "Clear repayment schedule", "Growth strategy articulated").
+You MUST output **at least 10** distinct insights derived ONLY from the essay sentences. For each:
+- `insight`: Concise title focusing on credit risk implications.
 - `evidence_sentence`: The full original sentence.
 - `sentence_index`: Index in essay sentence array.
-- `category`: One of ["Strategy", "Risk", "Cashflow", "Repayment", "Growth", "Stability", "Motivation", "Compliance"]. Pick best fit.
+- `category`: One of ["Eligibility", "Debt_Status", "Trustworthiness", "Affordability", "Risk", "Cashflow", "Repayment", "Strategy", "Growth", "Stability", "Motivation", "Compliance"]. Pick best fit.
 - `exact_quote`: Same as `evidence_sentence` (verbatim for highlighting).
+- `ai_justification`: Explain why this insight matters for credit risk assessment (2-3 sentences).
+
+**Priority Focus Areas:**
+- **Eligibility:** Does applicant meet basic loan criteria? Any red flags about purpose or background?
+- **Debt_Status:** Existing loans, PTPTN, credit cards, informal debts mentioned in essay
+- **Trustworthiness:** Honesty indicators, claim vs. reality verification, consistency with documents
+- **Affordability:** Can applicant realistically afford the loan? Income stability mentioned?
+- **Risk:** Strange spending patterns, financial distress signals, poor planning indicators
+- **Repayment:** How do they plan to repay? Realistic or vague?
+- **Financial Awareness:** Do they understand their financial situation?
+
+**Important:** Do NOT mix insights between different applications - each analysis must be unique to THIS applicant's essay only.
 Never merge two sentences; never paraphrase inside `exact_quote`.
 
 ### OUTPUT JSON (STRICT, NO MARKDOWN)
@@ -72,9 +84,10 @@ Never merge two sentences; never paraphrase inside `exact_quote`.
       "evidence_sentence": "I am confident I can repay within 24 months using monthly Shopee revenue.",
       "sentence_index": 3,
       "category": "Repayment",
-      "exact_quote": "I am confident I can repay within 24 months using monthly Shopee revenue."
+      "exact_quote": "I am confident I can repay within 24 months using monthly Shopee revenue.",
+      "ai_justification": "This shows repayment confidence with specific timeline and income source, indicating financial planning awareness and commitment to loan obligations."
     }
-    // >= 8 total objects
+    // >= 10 total objects with ai_justification for each
   ],
   "key_risk_flags": [
     {
