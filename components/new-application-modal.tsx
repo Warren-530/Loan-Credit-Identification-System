@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, CheckCircle2, ArrowRight } from "lucide-react"
+import { Plus, CheckCircle2, ArrowRight, FileText, Upload } from "lucide-react"
 import { api } from "@/lib/api"
 import { useRouter } from "next/navigation"
 
@@ -29,45 +29,41 @@ export function NewApplicationModal() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [applicationId, setApplicationId] = useState("")
-  const [loanType, setLoanType] = useState("Micro-Business Loan")
-  const [icNumber, setIcNumber] = useState("")
-  const [applicantName, setApplicantName] = useState("")
-  const [requestedAmount, setRequestedAmount] = useState("50000")
+  
+  // 4 Required Documents (removed manual input fields)
+  const [applicationForm, setApplicationForm] = useState<File | null>(null)
   const [bankStatement, setBankStatement] = useState<File | null>(null)
   const [essay, setEssay] = useState<File | null>(null)
   const [payslip, setPayslip] = useState<File | null>(null)
   const [batchFile, setBatchFile] = useState<File | null>(null)
 
   const handleSubmit = async () => {
-    if (!bankStatement || !icNumber || !applicantName) {
-      alert("Please provide Applicant Name, IC Number and Bank Statement")
+    // Validate all 4 documents are uploaded
+    if (!applicationForm || !bankStatement || !essay || !payslip) {
+      alert("Please upload ALL 4 required documents:\n1. Application Form\n2. Bank Statement\n3. Loan Essay\n4. Payslip")
       return
     }
 
     setLoading(true)
     try {
       const formData = new FormData()
-      formData.append("loan_type", loanType)
-      formData.append("ic_number", icNumber)
-      formData.append("applicant_name", applicantName)
-      formData.append("requested_amount", requestedAmount)
+      formData.append("application_form", applicationForm)
       formData.append("bank_statement", bankStatement)
-      if (essay) formData.append("essay", essay)
-      if (payslip) formData.append("payslip", payslip)
+      formData.append("essay", essay)
+      formData.append("payslip", payslip)
 
       const result = await api.uploadApplication(formData)
       
       setOpen(false)
       // Reset form
-      setIcNumber("")
-      setApplicantName("")
+      setApplicationForm(null)
       setBankStatement(null)
       setEssay(null)
       setPayslip(null)
       
       // Show success modal
       setApplicationId(result.application_id)
-      setSuccessMessage("Application submitted successfully!")
+      setSuccessMessage("Application submitted! AI is extracting applicant information from Application Form...")
       setShowSuccess(true)
       
       router.refresh()
@@ -137,101 +133,111 @@ export function NewApplicationModal() {
             <TabsTrigger value="batch">Batch Upload</TabsTrigger>
           </TabsList>
           <TabsContent value="single" className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="applicant-name">Applicant Name *</Label>
-                <Input 
-                  id="applicant-name" 
-                  placeholder="e.g. Ali bin Ahmad"
-                  value={applicantName}
-                  onChange={(e) => setApplicantName(e.target.value)}
-                  required
-                />
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-blue-900 text-sm">AI-Powered Application Processing</h4>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Upload 4 required documents. AI will automatically extract applicant information from the Application Form.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="ic-number">Applicant ID / IC *</Label>
-                <Input 
-                  id="ic-number" 
-                  placeholder="e.g. 890101-14-5566"
-                  value={icNumber}
-                  onChange={(e) => setIcNumber(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="loan-type">Loan Type</Label>
-              <select
-                id="loan-type"
-                value={loanType}
-                onChange={(e) => setLoanType(e.target.value)}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option>Micro-Business Loan</option>
-                <option>Personal Loan</option>
-                <option>Housing Loan</option>
-                <option>Car Loan</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="amount">Requested Amount (RM)</Label>
-              <Input 
-                id="amount" 
-                type="number"
-                placeholder="50000"
-                value={requestedAmount}
-                onChange={(e) => setRequestedAmount(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Bank Statement (PDF/TXT) *</Label>
-              <Input
-                type="file"
-                accept=".pdf,.txt"
-                onChange={(e) => setBankStatement(e.target.files?.[0] || null)}
-                className="cursor-pointer"
-              />
-              {bankStatement && (
-                <p className="text-xs text-emerald-600">✓ {bankStatement.name}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Loan Essay (PDF/TXT)</Label>
-              <Input
-                type="file"
-                accept=".pdf,.txt"
-                onChange={(e) => setEssay(e.target.files?.[0] || null)}
-                className="cursor-pointer"
-              />
-              {essay && (
-                <p className="text-xs text-emerald-600">✓ {essay.name}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Payslip (PDF/TXT)</Label>
-              <Input
-                type="file"
-                accept=".pdf,.txt"
-                onChange={(e) => setPayslip(e.target.files?.[0] || null)}
-                className="cursor-pointer"
-              />
-              {payslip && (
-                <p className="text-xs text-emerald-600">✓ {payslip.name}</p>
-              )}
-            </div>
 
-            <div className="flex justify-end pt-4">
-              <Button 
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={handleSubmit}
-                disabled={loading || !bankStatement || !icNumber || !applicantName}
-              >
-                {loading ? "Processing..." : "Start AI Analysis"}
-              </Button>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">1</span>
+                    Application Form (PDF) *
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setApplicationForm(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {applicationForm && (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {applicationForm.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500">Official loan application form with applicant details</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">2</span>
+                    Bank Statement (PDF) *
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setBankStatement(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {bankStatement && (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {bankStatement.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500">Recent bank account transaction history</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">3</span>
+                    Loan Essay (PDF) *
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setEssay(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {essay && (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {essay.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500">Applicant's written explanation of loan purpose</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">4</span>
+                    Payslip (PDF) *
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setPayslip(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {payslip && (
+                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {payslip.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500">Recent salary slip for income verification</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button 
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSubmit}
+                  disabled={loading || !applicationForm || !bankStatement || !essay || !payslip}
+                >
+                  {loading ? "Processing..." : (
+                    <span className="flex items-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      Submit & Analyze with AI
+                    </span>
+                  )}
+                </Button>
+              </div>
             </div>
           </TabsContent>
           <TabsContent value="batch" className="space-y-4 py-4">
@@ -239,18 +245,18 @@ export function NewApplicationModal() {
               <div>
                 <Label className="text-sm font-medium">Batch Upload Format</Label>
                 <p className="text-xs text-slate-500 mt-1">
-                  Upload a CSV file with columns: loan_type, ic_number, applicant_name, requested_amount, bank_statement_path, essay_path
+                  Upload a ZIP file containing multiple application folders, each with 4 documents
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Or upload a ZIP file containing a manifest.csv and all document files
+                  Folder structure: application_form.pdf, bank_statement.pdf, essay.pdf, payslip.pdf
                 </p>
               </div>
               
               <div className="space-y-2">
-                <Label>Upload CSV or ZIP File</Label>
+                <Label>Upload ZIP File</Label>
                 <Input
                   type="file"
-                  accept=".csv,.zip"
+                  accept=".zip"
                   onChange={(e) => setBatchFile(e.target.files?.[0] || null)}
                   className="cursor-pointer"
                 />

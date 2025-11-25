@@ -28,7 +28,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [currentPosition] = useState<number>(1) // position tracking placeholder
   const [totalApplications, setTotalApplications] = useState(0)
   const documentViewerRef = useRef<HTMLDivElement>(null)
-  const [docViewMode, setDocViewMode] = useState<'bank'|'essay'|'payslip'>('bank')
+  const [docViewMode, setDocViewMode] = useState<'application_form'|'bank'|'essay'|'payslip'>('application_form')
   const [showPdf, setShowPdf] = useState(false)
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [isPolling, setIsPolling] = useState(false)
@@ -640,6 +640,119 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
+        {/* Applicant Information Card - Extracted from Application Form */}
+        {analysis?.applicant_profile && (
+          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-slate-900 flex items-center gap-2">
+                    <User className="h-5 w-5 text-blue-600" />
+                    Applicant Information
+                  </CardTitle>
+                  <CardDescription>Extracted from Application Form by AI</CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-white text-blue-700 border-blue-300">
+                  <Bot className="h-3 w-3 mr-1" />
+                  AI Extracted
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Personal Details */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Full Name</p>
+                    <p className="text-sm font-semibold text-slate-900">{analysis.applicant_profile.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">IC / Passport No</p>
+                    <p className="text-sm font-mono text-slate-900">{analysis.applicant_profile.ic_number || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Phone</p>
+                    <p className="text-sm text-slate-900">{analysis.applicant_profile.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Email</p>
+                    <p className="text-sm text-slate-900 truncate">{analysis.applicant_profile.email || 'N/A'}</p>
+                  </div>
+                </div>
+                
+                {/* Loan & Financial Details */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Loan Type</p>
+                    <Badge className="mt-1 bg-blue-600 text-white">
+                      {analysis.applicant_profile.loan_type || 'N/A'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Requested Amount</p>
+                    <p className="text-sm font-bold text-emerald-700">
+                      RM {analysis.applicant_profile.requested_amount?.toLocaleString() || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Annual Income</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      RM {analysis.applicant_profile.annual_income?.toLocaleString() || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Loan Period</p>
+                    <p className="text-sm text-slate-900">{analysis.applicant_profile.period || 'N/A'}</p>
+                  </div>
+                </div>
+                
+                {/* Full Width Items */}
+                <div className="col-span-2 space-y-3 pt-3 border-t border-blue-200">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase">Address</p>
+                    <p className="text-sm text-slate-900">{analysis.applicant_profile.address || 'N/A'}</p>
+                  </div>
+                  {analysis.applicant_profile.loan_purpose && analysis.applicant_profile.loan_purpose.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase mb-2">Loan Purpose</p>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.applicant_profile.loan_purpose.map((purpose: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="bg-white text-slate-700 border-slate-300">
+                            {purpose}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Birth Date</p>
+                      <p className="text-sm text-slate-900">{analysis.applicant_profile.birth_date || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Marital Status</p>
+                      <p className="text-sm text-slate-900">{analysis.applicant_profile.marital_status || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Family Members</p>
+                      <p className="text-sm text-slate-900">{analysis.applicant_profile.family_members || 'N/A'}</p>
+                    </div>
+                  </div>
+                  {analysis.applicant_profile.bank_institution && (
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase">Bank Reference</p>
+                      <p className="text-sm text-slate-900">
+                        {analysis.applicant_profile.bank_institution}
+                        {analysis.applicant_profile.bank_account && ` - A/C: ${analysis.applicant_profile.bank_account}`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-slate-900">Score Drivers</CardTitle>
@@ -971,16 +1084,16 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       {/* Right Panel: PDF Viewer Only */}
       <div className="w-1/2 bg-white rounded-lg border border-slate-300 flex flex-col">
         <div className="flex items-center gap-2 p-3 border-b bg-slate-50">
-          {(['bank','essay','payslip'] as const).map(mode => (
+          {(['application_form','bank','essay','payslip'] as const).map(mode => (
             <Button key={mode} size="sm" variant={docViewMode===mode? 'default':'outline'} onClick={()=>setDocViewMode(mode)}>
-              {mode==='bank'? 'Bank Statement': mode==='essay'? 'Loan Essay':'Payslip'}
+              {mode==='application_form'? 'Application Form': mode==='bank'? 'Bank Statement': mode==='essay'? 'Loan Essay':'Payslip'}
             </Button>
           ))}
           <div className="ml-auto text-[11px] text-slate-500">PDF Viewer</div>
         </div>
         <div className="flex-1 overflow-hidden">
           {(() => {
-            const url = docViewMode==='bank'? appData.bank_statement_url : docViewMode==='essay'? appData.essay_url : appData.payslip_url
+            const url = docViewMode==='application_form'? appData.application_form_url : docViewMode==='bank'? appData.bank_statement_url : docViewMode==='essay'? appData.essay_url : appData.payslip_url
             if (!url) {
               return <div className="h-full flex items-center justify-center text-sm text-slate-400">No PDF available.</div>
             }

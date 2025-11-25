@@ -41,10 +41,12 @@ export interface ApplicationDetail {
     essay?: string;
     payslip?: string;
   };
+  application_form_url?: string;
   bank_statement_url?: string;
   essay_url?: string;
   payslip_url?: string;
   file_metadata?: {
+    application_form?: { filename: string; size_bytes: number; mime_type: string } | null;
     bank_statement?: { filename: string; size_bytes: number; mime_type: string } | null;
     loan_essay?: { filename: string; size_bytes: number; mime_type: string } | null;
     payslip?: { filename: string; size_bytes: number; mime_type: string } | null;

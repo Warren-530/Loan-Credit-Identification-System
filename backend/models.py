@@ -39,10 +39,11 @@ class Application(SQLModel, table=True):
     """Main application table"""
     id: Optional[int] = Field(default=None, primary_key=True)
     application_id: str = Field(index=True, unique=True)
-    applicant_name: str
-    applicant_ic: str
-    loan_type: LoanType
-    requested_amount: float
+    # Applicant info extracted from Application Form by AI
+    applicant_name: Optional[str] = None
+    applicant_ic: Optional[str] = None
+    loan_type: Optional[LoanType] = None
+    requested_amount: Optional[float] = None
     status: ApplicationStatus = ApplicationStatus.PROCESSING
     risk_score: Optional[int] = None
     risk_level: Optional[RiskLevel] = None
@@ -59,11 +60,11 @@ class Application(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Store file paths
+    # Store file paths (4 required documents)
+    application_form_path: Optional[str] = None  # NEW: Application Form PDF
     bank_statement_path: Optional[str] = None
     essay_path: Optional[str] = None
-    supporting_docs_path: Optional[str] = None
-    payslip_path: Optional[str] = None  # Newly added for payslip ingestion
+    payslip_path: Optional[str] = None
     
     # AI Analysis Results (JSON)
     analysis_result: Optional[dict] = Field(default=None, sa_column=Column(JSON))

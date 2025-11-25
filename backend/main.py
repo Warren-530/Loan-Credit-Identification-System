@@ -12,12 +12,21 @@ from datetime import datetime
 from pathlib import Path
 import asyncio
 from dotenv import load_dotenv
+import pytesseract
 
 from models import Application, ApplicationStatus, LoanType, RiskLevel, ReviewStatus, AnalysisCache
 from database import init_db, get_session
 from pdf_processor import PDFProcessor, TextProcessor
 from ai_engine import AIEngine
 from config import Config, RiskConfig, LoanConfig, AIConfig
+
+# Configure Tesseract OCR path (D: drive installation)
+if os.path.exists(r'D:\Tesseract\tesseract.exe'):
+    pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract\tesseract.exe'
+elif os.path.exists(r'D:\Tesseract-OCR\tesseract.exe'):
+    pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
+elif os.path.exists(r'C:\Program Files\Tesseract-OCR\tesseract.exe'):
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Load environment variables
 load_dotenv()
@@ -38,17 +47,30 @@ app.add_middleware(
 UPLOAD_DIR = Path(Config().UPLOAD_DIR)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+# AI-ONLY MODE: Set to True to reject fallback and require AI analysis
+AI_ONLY_MODE = True  # Set to False to allow fallback if AI fails
+
 # Initialize AI Engine
 GEMINI_API_KEY = os.getenv(AIConfig.GEMINI_API_KEY_ENV)
 if not GEMINI_API_KEY:
-    print("❌ WARNING: GEMINI_API_KEY not set. AI analysis will fail.")
-    print("   Using FALLBACK mode with rule-based analysis")
+    if AI_ONLY_MODE:
+        print("❌ CRITICAL ERROR: GEMINI_API_KEY not set and AI_ONLY_MODE is enabled!")
+        print("   System will REJECT all applications until API key is configured.")
+        print("   Set GEMINI_API_KEY environment variable or disable AI_ONLY_MODE.")
+    else:
+        print("❌ WARNING: GEMINI_API_KEY not set. AI analysis will fail.")
+        print("   Using FALLBACK mode with rule-based analysis")
     ai_engine = None
 else:
     ai_engine = AIEngine(GEMINI_API_KEY)
     print("✅ AI Engine initialized successfully!")
     print(f"   Model: {ai_engine.model_name}")
     print(f"   API Key: {GEMINI_API_KEY[:20]}...")
+    if AI_ONLY_MODE:
+        print("🔒 AI-ONLY MODE: Fallback disabled - all results from Gemini AI")
+
+# Mount static files for uploads (MUST be before route definitions)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.on_event("startup")
@@ -56,9 +78,6 @@ async def startup_event():
     """Initialize database on startup"""
     init_db()
     print("✓ Database initialized")
-    # Mount static uploads if not already
-    if "uploads" not in [r.path for r in app.routes]:
-        app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")
@@ -75,9 +94,9 @@ async def get_applications(limit: int = 50):
         return [
             {
                 "id": app.application_id,
-                "name": app.applicant_name,
-                "type": app.loan_type,
-                "amount": f"RM {app.requested_amount:,.0f}",
+                "name": app.applicant_name or "Unknown",
+                "type": app.loan_type or "N/A",
+                "amount": f"RM {app.requested_amount:,.0f}" if app.requested_amount else "N/A",
                 "score": app.risk_score or 0,
                 "status": app.final_decision if app.status == ApplicationStatus.APPROVED else app.status,
                 "date": app.created_at.isoformat(),
@@ -120,6 +139,7 @@ async def get_application(application_id: str):
         bank_url = build_file_url(app.bank_statement_path)
         essay_url = build_file_url(app.essay_path)
         payslip_url = build_file_url(app.payslip_path)
+        application_form_url = build_file_url(app.application_form_path)
 
         # File metadata helper
         import mimetypes
@@ -130,6 +150,7 @@ async def get_application(application_id: str):
             mime, _ = mimetypes.guess_type(path)
             return {"filename": os.path.basename(path), "size_bytes": size, "mime_type": mime or "application/octet-stream"}
         file_metadata = {
+            "application_form": meta(app.application_form_path),
             "bank_statement": meta(app.bank_statement_path),
             "loan_essay": meta(app.essay_path),
             "payslip": meta(app.payslip_path)
@@ -155,6 +176,7 @@ async def get_application(application_id: str):
             "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
             "override_reason": app.override_reason,
             "decision_history": app.decision_history or [],
+            "application_form_url": application_form_url,
             "bank_statement_url": bank_url,
             "essay_url": essay_url,
             "payslip_url": payslip_url,
@@ -200,15 +222,23 @@ async def debug_risk_flags(application_id: str):
 
 async def process_application_background(
     application_id: str,
-    loan_type: str,
+    application_form_path: str,
     bank_statement_path: str,
-    essay_path: Optional[str] = None,
-    payslip_path: Optional[str] = None
+    essay_path: str,
+    payslip_path: str
 ):
-    """Background task to process application with AI (now includes payslip)."""
+    """Background task to process application with AI - extracts applicant info from Application Form
+    
+    Args:
+        application_id: Unique application identifier
+        application_form_path: Path to Application Form PDF (for extracting applicant info)
+        bank_statement_path: Path to Bank Statement PDF
+        essay_path: Path to Loan Essay PDF
+        payslip_path: Path to Payslip PDF
+    """
     print(f"\n{'='*60}")
     print(f"Starting analysis for {application_id}")
-    print(f"Loan Type: {loan_type}")
+    print(f"Application Form: {application_form_path}")
     print(f"Bank Statement: {bank_statement_path}")
     print(f"Essay: {essay_path}")
     print(f"Payslip: {payslip_path}")
@@ -220,8 +250,6 @@ async def process_application_background(
             if not app:
                 print(f"ERROR: Application {application_id} not found in database!")
                 return
-            # Cache any attributes we will need after the session closes to avoid DetachedInstanceError
-            requested_amount_cached = app.requested_amount
             app.status = ApplicationStatus.ANALYZING
             session.add(app)
             session.commit()
@@ -233,42 +261,51 @@ async def process_application_background(
         text_processor = TextProcessor()
 
         raw_text = ""
+        application_form_text = ""
         bank_text = ""
         essay_text = ""
         payslip_text = ""
 
+        # Application Form (NEW - extract applicant info)
+        try:
+            print(f"Extracting application form from: {application_form_path}")
+            application_form_text = pdf_processor.extract_text(application_form_path) if application_form_path.endswith('.pdf') else text_processor.extract_text(application_form_path)
+            raw_text += f"\n\n=== APPLICATION FORM ===\n{application_form_text}"
+            print(f"✓ Application form extracted: {len(application_form_text)} characters")
+        except Exception as e:
+            print(f"⚠ Error extracting application form: {e}")
+            application_form_text = "Application form extraction failed"
+            raw_text += f"\n\n=== APPLICATION FORM ===\n{application_form_text}"
+
         # Bank Statement
-        if bank_statement_path:
-            try:
-                print(f"Extracting bank statement from: {bank_statement_path}")
-                bank_text = pdf_processor.extract_text(bank_statement_path) if bank_statement_path.endswith('.pdf') else text_processor.extract_text(bank_statement_path)
-                raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
-                print(f"✓ Bank statement extracted: {len(bank_text)} characters")
-            except Exception as e:
-                print(f"⚠ Error extracting bank statement: {e}")
-                bank_text = "Bank statement extraction failed"
-                raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
+        try:
+            print(f"Extracting bank statement from: {bank_statement_path}")
+            bank_text = pdf_processor.extract_text(bank_statement_path) if bank_statement_path.endswith('.pdf') else text_processor.extract_text(bank_statement_path)
+            raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
+            print(f"✓ Bank statement extracted: {len(bank_text)} characters")
+        except Exception as e:
+            print(f"⚠ Error extracting bank statement: {e}")
+            bank_text = "Bank statement extraction failed"
+            raw_text += f"\n\n=== BANK STATEMENT ===\n{bank_text}"
 
         # Essay
-        if essay_path:
-            try:
-                print(f"Extracting essay from: {essay_path}")
-                essay_text = pdf_processor.extract_text(essay_path) if essay_path.endswith('.pdf') else text_processor.extract_text(essay_path)
-                raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
-                print(f"✓ Essay extracted: {len(essay_text)} characters")
-            except Exception as e:
-                print(f"⚠ Error extracting essay: {e}")
-                essay_text = "Essay extraction failed"
-                raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
+        try:
+            print(f"Extracting essay from: {essay_path}")
+            essay_text = pdf_processor.extract_text(essay_path) if essay_path.endswith('.pdf') else text_processor.extract_text(essay_path)
+            raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
+            print(f"✓ Essay extracted: {len(essay_text)} characters")
+        except Exception as e:
+            print(f"⚠ Error extracting essay: {e}")
+            essay_text = "Essay extraction failed"
+            raw_text += f"\n\n=== LOAN APPLICATION ESSAY ===\n{essay_text}"
 
         # Payslip
-        if payslip_path:
-            try:
-                print(f"Extracting payslip from: {payslip_path}")
-                payslip_text = pdf_processor.extract_text(payslip_path) if payslip_path.endswith('.pdf') else text_processor.extract_text(payslip_path)
-                raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
-                print(f"✓ Payslip extracted: {len(payslip_text)} characters")
-            except Exception as e:
+        try:
+            print(f"Extracting payslip from: {payslip_path}")
+            payslip_text = pdf_processor.extract_text(payslip_path) if payslip_path.endswith('.pdf') else text_processor.extract_text(payslip_path)
+            raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
+            print(f"✓ Payslip extracted: {len(payslip_text)} characters")
+        except Exception as e:
                 print(f"⚠ Error extracting payslip: {e}")
                 payslip_text = "Payslip extraction failed"
                 raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
@@ -284,50 +321,134 @@ async def process_application_background(
             elif ai_engine:
                 try:
                     print("⚡ Running AI analysis with Gemini...")
-                    result = ai_engine.analyze_application(loan_type, raw_text, bank_text, essay_text, payslip_text, application_id)
+                    # Pass application_form_text to AI for extraction
+                    result = ai_engine.analyze_application(
+                        application_form_text, 
+                        raw_text, 
+                        bank_text, 
+                        essay_text, 
+                        payslip_text, 
+                        application_id
+                    )
                     print("✓ AI analysis completed (Gemini)")
                     cache = AnalysisCache(application_id=application_id, result_json=result)
                     session.add(cache)
                     session.commit()
                     print("✓ Result cached")
                 except Exception as e:
-                    print(f"⚠ AI analysis failed: {e}")
-                    print("🔄 Falling back to document-based analysis...")
-                    result = generate_mock_result(loan_type, raw_text, application_id, requested_amount_cached, bank_text, essay_text, payslip_text)
-                    print("✓ Fallback analysis completed")
+                    print(f"❌ AI analysis failed: {e}")
+                    if AI_ONLY_MODE:
+                        print("🚫 AI-ONLY MODE: Refusing to use fallback - marking as FAILED")
+                        raise Exception(f"AI analysis required but failed: {e}")
+                    else:
+                        print("🔄 Falling back to document-based analysis...")
+                        result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
+                        print("✓ Fallback analysis completed")
             else:
-                print("ℹ No Gemini API key configured")
-                print("🔄 Using document-based analysis...")
-                result = generate_mock_result(loan_type, raw_text, application_id, requested_amount_cached, bank_text, essay_text, payslip_text)
-                print("✓ Document-based analysis completed")
+                if AI_ONLY_MODE:
+                    print("🚫 AI-ONLY MODE: No API key configured - refusing to process")
+                    raise Exception("AI analysis required but GEMINI_API_KEY not configured")
+                else:
+                    print("ℹ No Gemini API key configured")
+                    print("🔄 Using document-based analysis...")
+                    result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
+                    print("✓ Document-based analysis completed")
 
         if not result:
             raise Exception("No analysis result generated!")
 
+        # Extract applicant info from AI response
+        applicant_info = result.get('applicant_profile', {})
+        applicant_name = applicant_info.get('name', 'Unknown')
+        applicant_ic = applicant_info.get('ic_number', 'N/A')
+        loan_type_str = applicant_info.get('loan_type', 'Unknown')
+        requested_amount = applicant_info.get('requested_amount')
+        
+        # Verify this is an AI result, not fallback
+        reasoning_log = result.get('ai_reasoning_log', [])
+        is_fallback = any('[FALLBACK]' in str(log) for log in reasoning_log)
+        if is_fallback:
+            print("⚠️  WARNING: Result came from FALLBACK mode (not AI)")
+            if AI_ONLY_MODE:
+                print("🚫 AI-ONLY MODE: Rejecting fallback result")
+                raise Exception("Fallback result detected in AI-ONLY mode")
+        else:
+            print("✅ VERIFIED: Result generated by Gemini AI (not fallback)")
+        
+        # Extract risk score and level from nested structure if needed
+        risk_score = result.get('risk_score')
+        risk_level = result.get('risk_level')
+        final_decision = result.get('final_decision')
+        
+        # If AI returns nested structure, extract from risk_score_analysis
+        if risk_score is None and 'risk_score_analysis' in result:
+            risk_analysis = result['risk_score_analysis']
+            risk_score = risk_analysis.get('final_score')
+            risk_level = risk_analysis.get('risk_level')
+        
+        # Auto-generate decision based on risk score if not provided
+        if final_decision is None and risk_score is not None:
+            if risk_score >= 70:
+                final_decision = "Approved"
+            elif risk_score >= 50:
+                final_decision = "Review Required"
+            else:
+                final_decision = "Rejected"
+        
+        # Update result with extracted values for consistency
+        result['risk_score'] = risk_score
+        result['risk_level'] = risk_level
+        result['final_decision'] = final_decision
+
+        print("\nExtracted Applicant Info:")
+        print(f"  Name: {applicant_name}")
+        print(f"  IC: {applicant_ic}")
+        print(f"  Loan Type: {loan_type_str}")
+        print(f"  Requested Amount: RM {requested_amount}")
+        
         print("\nAnalysis Result:")
-        print(f"  Risk Score: {result.get('risk_score')}")
-        print(f"  Risk Level: {result.get('risk_level')}")
-        print(f"  Decision: {result.get('final_decision')}")
+        print(f"  Risk Score: {risk_score}")
+        print(f"  Risk Level: {risk_level}")
+        print(f"  Decision: {final_decision}")
 
         with get_session() as session:
             app = session.query(Application).filter(Application.application_id == application_id).first()
             if app:
+                # Update applicant info extracted from Application Form
+                app.applicant_name = applicant_name
+                app.applicant_ic = applicant_ic
+                if loan_type_str:
+                    try:
+                        # Try to map to LoanType enum
+                        loan_type_mapping = {
+                            "micro-business": LoanType.MICRO_BUSINESS,
+                            "micro business": LoanType.MICRO_BUSINESS,
+                            "personal": LoanType.PERSONAL,
+                            "housing": LoanType.HOUSING,
+                            "car": LoanType.CAR,
+                            "hire purchase": LoanType.CAR,  # Based on your example
+                        }
+                        app.loan_type = loan_type_mapping.get(loan_type_str.lower(), None)
+                    except:
+                        pass
+                app.requested_amount = requested_amount
+                
                 # Map final decision directly to status for user clarity
-                decision = result.get("final_decision", "Review Required")
+                decision = final_decision or "Review Required"
                 status_map = {
                     "Approved": ApplicationStatus.APPROVED,
                     "Rejected": ApplicationStatus.REJECTED,
                     "Review Required": ApplicationStatus.REVIEW_REQUIRED
                 }
                 app.status = status_map.get(decision, ApplicationStatus.REVIEW_REQUIRED)
-                app.risk_score = result.get("risk_score", 50)
-                rl_val = result.get("risk_level", "Medium") or "Medium"
+                app.risk_score = risk_score or 50
+                rl_val = risk_level or "Medium"
                 if rl_val not in RiskLevel._value2member_map_:
                     print(f"[WARN] Unknown risk_level '{rl_val}' in result. Falling back to 'Medium'. Keys: {list(result.keys())}")
                     rl_val = "Medium"
                 app.risk_level = RiskLevel(rl_val)
-                app.final_decision = result.get("final_decision", "Review Required")
-                app.ai_decision = result.get("final_decision", "Review Required")
+                app.final_decision = final_decision or "Review Required"
+                app.ai_decision = final_decision or "Review Required"
                 app.analysis_result = result
                 app.updated_at = datetime.utcnow()
                 app.decision_history = [{
@@ -361,16 +482,16 @@ async def process_application_background(
 @app.post("/api/upload")
 async def upload_application(
     background_tasks: BackgroundTasks,
-    loan_type: str = Form(...),
-    ic_number: str = Form(...),
-    applicant_name: str = Form(default="Unknown Applicant"),
-    requested_amount: float = Form(default=50000),
+    application_form: UploadFile = File(...),  # NEW: Application Form (required)
     bank_statement: UploadFile = File(...),
-    essay: Optional[UploadFile] = File(None),
-    payslip: Optional[UploadFile] = File(None),
-    supporting_docs: Optional[UploadFile] = File(None),
+    essay: UploadFile = File(...),
+    payslip: UploadFile = File(...),
 ):
-    """Upload new loan application"""
+    """Upload new loan application with 4 required documents
+    
+    All applicant information (name, IC, loan type, amount) will be extracted
+    from the Application Form PDF by AI.
+    """
     try:
         # Generate application ID
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -380,46 +501,35 @@ async def upload_application(
         app_folder = UPLOAD_DIR / application_id
         app_folder.mkdir(exist_ok=True)
         
+        # Save Application Form (NEW)
+        application_form_path = app_folder / application_form.filename
+        with open(application_form_path, "wb") as buffer:
+            shutil.copyfileobj(application_form.file, buffer)
+        
         # Save bank statement
         bank_statement_path = app_folder / bank_statement.filename
         with open(bank_statement_path, "wb") as buffer:
             shutil.copyfileobj(bank_statement.file, buffer)
         
-        # Save essay if provided
-        essay_path = None
-        if essay:
-            essay_path = app_folder / essay.filename
-            with open(essay_path, "wb") as buffer:
-                shutil.copyfileobj(essay.file, buffer)
+        # Save essay
+        essay_path = app_folder / essay.filename
+        with open(essay_path, "wb") as buffer:
+            shutil.copyfileobj(essay.file, buffer)
 
-        # Save payslip if provided
-        payslip_path = None
-        if payslip:
-            payslip_path = app_folder / payslip.filename
-            with open(payslip_path, "wb") as buffer:
-                shutil.copyfileobj(payslip.file, buffer)
+        # Save payslip
+        payslip_path = app_folder / payslip.filename
+        with open(payslip_path, "wb") as buffer:
+            shutil.copyfileobj(payslip.file, buffer)
         
-        # Create application record
-        # Normalize loan type codes (support both descriptive & shorthand)
-        LT_MAP = {
-            "MICRO_BUSINESS": LoanType.MICRO_BUSINESS.value,
-            "PERSONAL": LoanType.PERSONAL.value,
-            "HOUSING": LoanType.HOUSING.value,
-            "CAR": LoanType.CAR.value,
-        }
-        normalized_loan_type = LT_MAP.get(loan_type, loan_type)
-
+        # Create application record (all fields will be filled by AI)
         with get_session() as session:
             app = Application(
                 application_id=application_id,
-                applicant_name=applicant_name,
-                applicant_ic=ic_number,
-                loan_type=LoanType(normalized_loan_type),
-                requested_amount=requested_amount,
                 status=ApplicationStatus.PROCESSING,
+                application_form_path=str(application_form_path),
                 bank_statement_path=str(bank_statement_path),
-                essay_path=str(essay_path) if essay_path else None,
-                payslip_path=str(payslip_path) if payslip_path else None,
+                essay_path=str(essay_path),
+                payslip_path=str(payslip_path),
             )
             session.add(app)
             session.commit()
@@ -428,16 +538,16 @@ async def upload_application(
         background_tasks.add_task(
             process_application_background,
             application_id,
-            loan_type,
+            str(application_form_path),
             str(bank_statement_path),
-            str(essay_path) if essay_path else None,
-            str(payslip_path) if payslip_path else None
+            str(essay_path),
+            str(payslip_path)
         )
         
         return {
             "success": True,
             "application_id": application_id,
-            "message": "Application submitted for analysis"
+            "message": "Application submitted for AI analysis (extracting applicant info from form)"
         }
         
     except Exception as e:
@@ -920,6 +1030,63 @@ def apply_common_risk_factors(text_lower, bank_text, essay_text, payslip_text, b
     
     return base_score
 
+# Helper functions for Application Form extraction
+def extract_field(text: str, pattern: str) -> str:
+    """Extract field value using regex pattern"""
+    import re
+    match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+def extract_number(text: str, pattern: str) -> int:
+    """Extract numeric value using regex pattern"""
+    import re
+    match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+    if match:
+        try:
+            return int(re.sub(r'[^\d]', '', match.group(1)))
+        except:
+            return None
+    return None
+
+def extract_loan_type_from_form(text: str) -> str:
+    """Extract checked loan type from Application Form"""
+    loan_types = {
+        r'\[x\]\s*Micro-Business': 'Micro-Business Loan',
+        r'\[x\]\s*Personal': 'Personal Loan',
+        r'\[x\]\s*Housing': 'Housing Loan',
+        r'\[x\]\s*Car': 'Car Loan',
+    }
+    import re
+    for pattern, loan_type in loan_types.items():
+        if re.search(pattern, text, re.IGNORECASE):
+            return loan_type
+    return None
+
+def extract_loan_purposes(text: str) -> list:
+    """Extract checked loan purposes from Application Form"""
+    purposes = []
+    checkboxes = {
+        'Business Launching': r'\[x\]\s*Business\s*Launching',
+        'House Buying': r'\[x\]\s*House\s*Buying',
+        'Home Improvement': r'\[x\]\s*Home\s*Improvement',
+        'Investment': r'\[x\]\s*Investment',
+        'Education': r'\[x\]\s*Education',
+        'Car Buying': r'\[x\]\s*Car\s*Buying',
+        'Credit Cards': r'\[x\]\s*Credit\s*Cards',
+        'Internet Loans': r'\[x\]\s*Internet\s*Loans',
+    }
+    import re
+    for purpose, pattern in checkboxes.items():
+        if re.search(pattern, text, re.IGNORECASE):
+            purposes.append(purpose)
+    
+    # Check for "Other" with custom text
+    other_match = re.search(r'\[x\]\s*Other[:\s]+([^\n]+)', text, re.IGNORECASE)
+    if other_match:
+        purposes.append(f"Other: {other_match.group(1).strip()}")
+    
+    return purposes if purposes else None
+
 def extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_score, loan_type):
     """
     Extract specific risk factors with actual evidence from uploaded documents.
@@ -1246,14 +1413,36 @@ def generate_mock_result(
     requested_amount: float = 0.0,
     bank_text: str = "",
     essay_text: str = "",
-    payslip_text: str = ""
+    payslip_text: str = "",
+    application_form_text: str = ""
 ) -> dict:
-    """Comprehensive loan-specific scoring system based on actual document analysis"""
+    """Comprehensive loan-specific scoring system based on actual document analysis
+    Now includes applicant info extraction from Application Form"""
     import hashlib, re
     
     # Generate deterministic but varied results based on actual content
     content_hash = hashlib.md5(f"{application_id}{raw_text[:500]}".encode()).hexdigest()
     hash_value = int(content_hash[:8], 16)
+    
+    # Extract applicant info from Application Form using regex
+    applicant_profile = {
+        "name": extract_field(application_form_text, r"NAME\s*:\s*([^\n]+)") or "Unknown Applicant",
+        "ic_number": extract_field(application_form_text, r"(?:MYKAD|PASSPORT)\s*NO\s*:\s*([^\n]+)") or "N/A",
+        "loan_type": extract_loan_type_from_form(application_form_text) or loan_type,
+        "requested_amount": extract_number(application_form_text, r"DESIRED LOAN AMOUNT.*?(\d+)") or requested_amount,
+        "annual_income": extract_number(application_form_text, r"ANNUAL INCOME.*?(\d+)"),
+        "period": extract_field(application_form_text, r"PERIOD\s*:\s*([^\n]+)"),
+        "loan_purpose": extract_loan_purposes(application_form_text),
+        "phone": extract_field(application_form_text, r"PHONE\s*NO\s*:\s*([^\n]+)"),
+        "email": extract_field(application_form_text, r"EMAIL\s*:\s*([^\n]+)"),
+        "address": extract_field(application_form_text, r"ADDRESS\s*:\s*([^\n]+)"),
+        "birth_date": extract_field(application_form_text, r"BIRTH\s*DATE\s*:\s*([^\n]+)"),
+        "marital_status": extract_field(application_form_text, r"MARITAL\s*STATUS\s*:\s*([^\n]+)"),
+        "family_members": extract_number(application_form_text, r"NUMBER\s*OF\s*FAMILY\s*MEMBERS\s*:\s*(\d+)"),
+        "bank_institution": extract_field(application_form_text, r"INSTITUTION\s*NAME\s*:\s*([^\n]+)"),
+        "bank_account": extract_field(application_form_text, r"SAVING\s*ACCOUNT\s*:\s*([^\n]+)"),
+        "id": application_id
+    }
     
     # Loan-specific base scoring
     loan_type_bases = {
@@ -1343,11 +1532,7 @@ def generate_mock_result(
     key_risk_flags = extract_document_risk_evidence(bank_text, essay_text, payslip_text, final_score, loan_clean_type)
     
     return {
-        "applicant_profile": {
-            "name": "Applicant",
-            "id": application_id,
-            "loan_type": loan_type
-        },
+        "applicant_profile": applicant_profile,  # Use extracted profile from Application Form
         "risk_score_analysis": {
             "final_score": final_score,
             "risk_level": risk_level,
@@ -1361,6 +1546,7 @@ def generate_mock_result(
         "behavioral_insights": [],
         "ai_reasoning_log": [
             "[FALLBACK] AI analysis unavailable, using document-based heuristics",
+            f"[FALLBACK] Extracted applicant info from Application Form: {applicant_profile.get('name', 'Unknown')}",
             f"[FALLBACK] Processed {len(raw_text)} characters of content",
             f"[FALLBACK] Applied {len(detailed_score_breakdown)} scoring factors",
             f"[FALLBACK] Generated risk score: {final_score}"

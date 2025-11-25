@@ -136,31 +136,44 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{app.amount}</TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <span className={`text-2xl font-bold tabular-nums ${
-                          app.score >= 80 ? "text-emerald-600" :
-                          app.score >= 60 ? "text-amber-600" : 
-                          app.score > 0 ? "text-rose-600" : "text-slate-400"
-                        }`}>
-                          {app.score > 0 ? app.score : "—"}
-                        </span>
-                        {app.score > 0 && (
-                          <div className="flex flex-col gap-1">
-                            <div className="h-1.5 w-20 rounded-full bg-slate-100 overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  app.score >= 80 ? "bg-emerald-500" :
-                                  app.score >= 60 ? "bg-amber-500" : "bg-rose-500"
-                                }`} 
-                                style={{ width: `${Math.min(app.score, 100)}%` }} 
-                              />
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {app.score >= 80 ? "Low Risk" : app.score >= 60 ? "Medium" : "High Risk"}
-                            </span>
+                      {app.status === "Analyzing" || app.status === "Processing" ? (
+                        <div className="flex items-center space-x-3">
+                          <div className="flex flex-col gap-2">
+                            <div className="h-8 w-16 bg-gradient-to-r from-blue-100 via-blue-200 to-blue-100 rounded animate-pulse" style={{backgroundSize: '200% 100%', animation: 'shimmer 2s infinite'}} />
+                            <div className="h-1.5 w-20 bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 rounded-full animate-pulse" style={{backgroundSize: '200% 100%', animation: 'shimmer 2s infinite'}} />
                           </div>
-                        )}
-                      </div>
+                          <div className="flex items-center gap-1">
+                            <div className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
+                            <span className="text-xs text-blue-600 font-medium">Analyzing...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-2xl font-bold tabular-nums ${
+                            app.score >= 80 ? "text-emerald-600" :
+                            app.score >= 60 ? "text-amber-600" : 
+                            app.score > 0 ? "text-rose-600" : "text-slate-400"
+                          }`}>
+                            {app.score > 0 ? app.score : "—"}
+                          </span>
+                          {app.score > 0 && (
+                            <div className="flex flex-col gap-1">
+                              <div className="h-1.5 w-20 rounded-full bg-slate-100 overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    app.score >= 80 ? "bg-emerald-500" :
+                                    app.score >= 60 ? "bg-amber-500" : "bg-rose-500"
+                                  }`} 
+                                  style={{ width: `${Math.min(app.score, 100)}%` }} 
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {app.score >= 80 ? "Low Risk" : app.score >= 60 ? "Medium" : "High Risk"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className={

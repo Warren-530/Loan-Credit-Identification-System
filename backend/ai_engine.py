@@ -3,8 +3,10 @@ AI Engine for document analysis using Google Gemini
 """
 import json
 import re
+import time
 from typing import Dict, Any
 import google.generativeai as genai
+from google.api_core import exceptions
 from prompts import build_prompt
 
 
@@ -12,40 +14,78 @@ class AIEngine:
     def __init__(self, api_key: str):
         """Initialize Gemini AI with API key"""
         genai.configure(api_key=api_key)
-        self.model_name = "gemini-2.0-flash-exp"
+        # Using gemini-2.0-flash (stable, fast, balanced - successor to 1.5-flash)
+        self.model_name = "models/gemini-2.0-flash"
+        self.max_retries = 3
     
-    def analyze_application(self, loan_type: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "") -> Dict[str, Any]:
+    def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "") -> Dict[str, Any]:
         """
         Analyze loan application using Gemini AI
         
         Args:
-            loan_type: Type of loan (Micro-Business, Personal, Housing, Car)
-            raw_text: Extracted text from documents
+            application_form_text: Extracted text from Application Form PDF (for applicant info extraction)
+            raw_text: Combined text from all 4 documents
             bank_text: Extracted bank statement text for display
             essay_text: Extracted essay text for display
             payslip_text: Extracted payslip text for display
             application_id: Unique application ID for context isolation
             
         Returns:
-            Analysis result as dictionary with document_texts attached
+            Analysis result as dictionary with applicant_profile and document_texts attached
         """
         try:
-            # Build the prompt with application ID for context
-            prompt = build_prompt(loan_type, raw_text, application_id)
+            # Build the prompt with application ID for context and application form
+            print(f"[AI ENGINE] Building prompt for {application_id}, text length: {len(raw_text)}")
+            prompt = build_prompt(application_form_text, raw_text, application_id)
+            print(f"[AI ENGINE] Prompt built, length: {len(prompt)} characters")
             
-            # Call Gemini API
-            model = genai.GenerativeModel(self.model_name)
-            response = model.generate_content(prompt)
+            # Call Gemini API with retry logic for rate limits
+            print(f"[AI ENGINE] Initializing Gemini model: {self.model_name}")
+            model = genai.GenerativeModel(
+                self.model_name,
+                generation_config={
+                    "response_mime_type": "application/json"
+                }
+            )
+            
+            # Retry loop for rate limit handling
+            response = None
+            for attempt in range(self.max_retries):
+                try:
+                    print(f"[AI ENGINE] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
+                    response = model.generate_content(prompt)
+                    print(f"[AI ENGINE] Gemini API call completed successfully")
+                    break
+                except exceptions.ResourceExhausted as e:
+                    if attempt < self.max_retries - 1:
+                        wait_time = 10 * (attempt + 1)  # Exponential backoff: 10s, 20s, 30s
+                        print(f"[AI ENGINE] Rate limit hit. Waiting {wait_time} seconds before retry...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"[AI ENGINE] Max retries reached. Rate limit still active.")
+                        raise
             
             # Extract JSON from response
             result_text = response.text.strip()
+            print(f"[DEBUG] Raw Gemini response length: {len(result_text)} characters")
+            print(f"[DEBUG] First 200 chars: {result_text[:200]}")
             
-            # Remove markdown code blocks if present
+            # Remove markdown code blocks if present (shouldn't be needed with JSON mode)
             result_text = re.sub(r'^```json\s*', '', result_text)
             result_text = re.sub(r'\s*```$', '', result_text)
+            result_text = result_text.strip()
+            
+            print(f"[DEBUG] After cleanup, first 200 chars: {result_text[:200]}")
             
             # Parse JSON
-            result = json.loads(result_text)
+            try:
+                result = json.loads(result_text)
+                print(f"[DEBUG] JSON parsed successfully")
+            except json.JSONDecodeError as json_err:
+                print(f"[ERROR] JSON Parse Failed: {json_err}")
+                print(f"[ERROR] Position: line {json_err.lineno}, column {json_err.colno}")
+                print(f"[ERROR] Full response:\n{result_text}")
+                raise
             
             # CRITICAL: Enforce minimum 4 risk flags requirement
             risk_flags = result.get('key_risk_flags', [])
@@ -177,4 +217,8 @@ class AIEngine:
             }
         except Exception as e:
             print(f"AI Engine Error: {e}")
+            print(f"Error Type: {type(e).__name__}")
+            print(f"Full error details: {str(e)}")
+            if 'result_text' in locals():
+                print(f"Raw AI response (first 500 chars): {result_text[:500]}")
             raise
