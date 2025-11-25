@@ -59,6 +59,7 @@ class Application(SQLModel, table=True):
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    processing_time: Optional[float] = None  # Processing time in seconds
     
     # Store file paths (4 required documents)
     application_form_path: Optional[str] = None  # NEW: Application Form PDF

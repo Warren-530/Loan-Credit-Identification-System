@@ -318,6 +318,7 @@ async def process_application_background(
         print(f"\nTotal raw text length: {len(raw_text)} characters")
 
         result = None
+        processing_start = datetime.utcnow()
         with get_session() as session:
             cached = session.query(AnalysisCache).filter(AnalysisCache.application_id == application_id).first()
             if cached:
@@ -358,6 +359,11 @@ async def process_application_background(
                     print("🔄 Using document-based analysis...")
                     result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
                     print("✓ Document-based analysis completed")
+        
+        # Calculate processing time
+        processing_end = datetime.utcnow()
+        processing_time = (processing_end - processing_start).total_seconds()
+        print(f"⏱️  Processing time: {processing_time:.2f}s")
 
         if not result:
             raise Exception("No analysis result generated!")
@@ -455,6 +461,7 @@ async def process_application_background(
                 app.final_decision = final_decision or "Review Required"
                 app.ai_decision = final_decision or "Review Required"
                 app.analysis_result = result
+                app.processing_time = processing_time
                 app.updated_at = datetime.utcnow()
                 app.decision_history = [{
                     "timestamp": datetime.utcnow().isoformat(),
@@ -769,10 +776,24 @@ async def navigate_application(application_id: str, direction: str = "next"):
 
 @app.get("/api/applications/stats")
 async def get_application_stats():
-    """Get current position stats for navigation"""
+    """Get current position stats for navigation and processing stats"""
     with get_session() as session:
         total = session.query(Application).count()
-        return {"total": total}
+        
+        # Calculate average processing time
+        apps_with_time = session.query(Application).filter(
+            Application.processing_time.isnot(None)
+        ).all()
+        
+        avg_processing_time = 0.0
+        if apps_with_time:
+            total_time = sum(app.processing_time for app in apps_with_time if app.processing_time)
+            avg_processing_time = total_time / len(apps_with_time)
+        
+        return {
+            "total": total,
+            "avg_processing_time": round(avg_processing_time, 1)
+        }
 
 
 
