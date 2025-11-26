@@ -51,16 +51,18 @@ You will receive data wrapped in XML tags for clear document boundaries:
    - LLMs are bad at division. **Extract RAW values** for Python to calculate ratios later.
    - **Savings Rate Logic**: Do not look at just one closing balance. Look at the trend: `(Total Monthly Credits - Total Monthly Debits)`. Positive means saving; negative means overspending.
    - **DSR Logic**: Ensure the "Net Monthly Income" used for DSR is the **Net Pay** from Payslip, not Gross.
+   - **SHOW YOUR WORK**: For every calculation, you must output the formula with the actual numbers used. e.g., `DSR = (Total Debt 1500 / Net Income 5000) * 100 = 30%`.
 
 5. **Luxury Spending (Strict Whitelist)**:
    - **IS LUXURY**: LV, Gucci, Rolex, Fine Dining >RM200, 5-Star Hotels.
    - **NOT LUXURY**: Uniqlo, KFC, Shell, Watson, Tesco, 99 Speedmart.
    - Only flag if "Miscellaneous" > 30% of Net Income.
 
-6. **Document Isolation**: 
+6. **Document Isolation & Integrity**: 
    - Context Scope: **Application ID: {id}** ONLY
-   - NEVER mix information between applications
-   - Each XML tag contains data for THIS applicant only
+   - **WARNING**: You are analyzing Application ID: {id}. If you see data from other applicants (e.g., different names in filenames or content), IGNORE IT. Only use data that matches the Applicant Name in the Application Form.
+   - NEVER mix information between applications.
+   - Each XML tag contains data for THIS applicant only.
 
 ### STEP 1: EXTRACT APPLICANT INFORMATION (VISUAL EXTRACTION)
 From the "=== APPLICATION FORM ===" (provided as an IMAGE), extract:
@@ -118,58 +120,53 @@ Output this information in the `applicant_profile` section with ALL extracted fi
 2. Identify the Loan Essay section and split it into sentences
 3. Build an ordered array of cleaned essay sentences
 
-### FINANCIAL METRICS CALCULATION (MANDATORY)
+### FINANCIAL DATA EXTRACTION & METRICS (MANDATORY)
 
-You MUST calculate the following 6 financial metrics using data from the 4 documents:
+You MUST first extract the RAW financial numbers from the documents, and then calculate the 6 financial metrics.
+**RULE**: If Bank Statement and Payslip differ on Net Income, use the **LOWER** value for conservative estimation.
+
+**STEP 1: EXTRACT RAW DATA (Exact numbers from documents)**
+- **Monthly Gross Income**: From Payslip (Basic + Fixed Allowances).
+- **Monthly Net Income**: From Payslip (Net Pay) OR Bank Statement (Salary Credit). *Use lower if different.*
+- **Total Monthly Debt**: Sum of Payslip deductions (PTPTN, Loans) + Debt payments in Bank Statement (Loans, Credit Cards).
+- **Total Living Expenses**: Sum of Grocery, Dining, Utilities, Transport, Shopping from Bank Statement.
+- **Monthly Closing Balance**: Last month's closing balance from Bank Statement.
+- **Asset Value**: Car Price or Property Price (if applicable).
+- **Loan Amount**: From Application Form.
+- **Loan Tenure (Months)**: From Application Form.
+
+**STEP 2: CALCULATE METRICS (Show Formula with Numbers)**
 
 **1. DEBT SERVICE RATIO (DSR)**
-Formula: (Total Monthly Debt Commitments ÷ Net Monthly Income) × 100%
-- Extract existing commitments from Payslip deductions (PTPTN, Credit Card, Personal Loan)
-- Extract debt mentions from Essay
-- Calculate estimated new loan installment: Requested Amount ÷ Period (in months)
-- Sum all monthly debts and divide by net income from Payslip
+Formula: `((Total Monthly Debt + (Loan Amount / Loan Tenure)) / Net Monthly Income) * 100`
+- *Example*: `((1000 + (50000/60)) / 4000) * 100 = 45.8%`
 - Assessment: <40% = Low Risk, 40-60% = Moderate, >60% = High Risk
 
 **2. NET DISPOSABLE INCOME (NDI)**
-Formula: Net Monthly Income - Total Monthly Debt - Living Expenses
-- Net income from Payslip
-- Total debt from DSR calculation
-- Living expenses from Bank Statement (Grocery, Utilities, Misc)
+Formula: `Net Monthly Income - Total Monthly Debt - (Loan Amount / Loan Tenure) - Living Expenses`
 - Assessment: >RM2000 = Sufficient Buffer, RM1000-2000 = Tight, <RM1000 = Critical
 
 **3. LOAN-TO-VALUE RATIO (LTV)** [Car & Housing loans only]
-Formula: (Loan Amount ÷ Asset Value) × 100%
-- For Car Loan: Extract car price from Essay or Application Form
-- For Housing Loan: Extract property value from Essay or Application Form
-- Calculate: Loan Amount ÷ Asset Value × 100%
+Formula: `(Loan Amount / Asset Value) * 100`
 - Assessment: Check against Malaysia standards (Car: max 90%, Housing: max 90%)
-- Set "applicable": false for Personal/Micro-Business loans
 
 **4. PER CAPITA INCOME**
-Formula: Net Monthly Income ÷ Family Members
-- Net monthly income from Payslip (Annual Income ÷ 12)
-- Family members from Application Form
+Formula: `Net Monthly Income / Family Members`
 - Assessment: >RM2000 = Comfortable, RM1000-2000 = Moderate, <RM1000 = Struggling
-- Add risk_flag if per capita is low (<RM1000) even with good DSR
 
 **5. SAVINGS RATE**
-Formula: (Monthly Closing Balance ÷ Monthly Income) × 100%
-- Closing balance from Bank Statement last month
-- Monthly income from Bank Statement salary credit
+Formula: `(Monthly Closing Balance / Net Monthly Income) * 100`
 - Assessment: >50% = High Saver, 20-50% = Moderate, <20% = Low Saver
 
 **6. COST OF LIVING RATIO**
-Formula: (Total Living Expenses ÷ Net Income) × 100%
-- Extract living expenses from Bank Statement (Grocery, Dining, Shopping, Utilities)
-- Net income from Payslip
+Formula: `(Total Living Expenses / Net Monthly Income) * 100`
 - Assessment: <30% = Frugal, 30-50% = Moderate, >50% = High
 
-**IMPORTANT**: For all metrics, include:
-- Actual calculated value
-- Formatted percentage (where applicable)
-- Detailed calculation breakdown showing source numbers
-- Assessment category (Low/Medium/High risk)
-- Evidence quote from source documents
+**IMPORTANT**: For all metrics, you MUST provide:
+- **Source Numbers**: Where did you get the numbers? (e.g., "Debt RM1000 from Payslip deduction")
+- **Calculation**: The formula with the numbers plugged in.
+- **Result**: The final calculated value.
+- **Assessment**: The risk category based on the result.
 
 ### RISK SCORING - COMPREHENSIVE MULTI-FACTOR ANALYSIS (0-100)
 
@@ -515,6 +512,16 @@ Required structure:
       "string (e.g., 'Bank Statement Balance Error: Opening RM5000 + Credits RM8000 - Debits RM7000 should equal RM6000, but Closing shows RM5800')",
       "string (e.g., 'Income Mismatch: Payslip Net Pay RM3500 does not match Application Form Annual Income RM60000 / 12 = RM5000')"
     ]
+  },
+  "financial_data_extraction": {
+    "monthly_gross_income": 0.0,
+    "monthly_net_income": 0.0,
+    "total_monthly_debt": 0.0,
+    "total_living_expenses": 0.0,
+    "monthly_closing_balance": 0.0,
+    "asset_value": 0.0,
+    "loan_amount": 0.0,
+    "loan_tenure_months": 0
   },
   "financial_metrics": {
     "debt_service_ratio": {

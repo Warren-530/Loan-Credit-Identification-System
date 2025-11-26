@@ -100,6 +100,9 @@ class AIEngine:
             try:
                 result = json.loads(result_text)
                 print(f"[DEBUG] JSON parsed successfully")
+                
+                # Recalculate metrics with Python for accuracy
+                result = self.recalculate_financial_metrics(result)
             except json.JSONDecodeError as json_err:
                 print(f"[ERROR] JSON Parse Failed: {json_err}")
                 print(f"[ERROR] Position: line {json_err.lineno}, column {json_err.colno}")
@@ -397,6 +400,9 @@ class AIEngine:
             result = json.loads(result_text)
             print(f"[DEBUG] JSON parsed successfully")
             
+            # Recalculate metrics with Python for accuracy
+            result = self.recalculate_financial_metrics(result)
+            
             # Attach original document texts for frontend display
             result['document_texts'] = {
                 'bank_statement': bank_text,
@@ -411,3 +417,135 @@ class AIEngine:
             print(f"[ERROR] JSON Parse Failed: {json_err}")
             print(f"[ERROR] Full response:\n{result_text}")
             raise
+        
+    def recalculate_financial_metrics(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recalculate financial metrics using Python to ensure mathematical accuracy.
+        Uses raw data extracted by AI in 'financial_data_extraction'.
+        """
+        print("[AI ENGINE] Recalculating financial metrics with Python...")
+        
+        try:
+            data = result.get('financial_data_extraction', {})
+            metrics = result.get('financial_metrics', {})
+            
+            # Extract raw values (default to 0.0 if missing)
+            gross_income = float(data.get('monthly_gross_income', 0.0))
+            net_income = float(data.get('monthly_net_income', 0.0))
+            total_debt = float(data.get('total_monthly_debt', 0.0))
+            living_expenses = float(data.get('total_living_expenses', 0.0))
+            closing_balance = float(data.get('monthly_closing_balance', 0.0))
+            asset_value = float(data.get('asset_value', 0.0))
+            loan_amount = float(data.get('loan_amount', 0.0))
+            loan_tenure = float(data.get('loan_tenure_months', 0.0))
+            family_members = float(result.get('applicant_profile', {}).get('family_members', 1))
+            
+            if family_members < 1: family_members = 1
+            
+            # 1. Debt Service Ratio (DSR)
+            # Formula: ((Total Monthly Debt + (Loan Amount / Loan Tenure)) / Net Monthly Income) * 100
+            new_installment = 0.0
+            if loan_tenure > 0:
+                new_installment = loan_amount / loan_tenure
+            
+            dsr_value = 0.0
+            if net_income > 0:
+                dsr_value = ((total_debt + new_installment) / net_income) * 100
+            
+            metrics['debt_service_ratio']['value'] = round(dsr_value, 2)
+            metrics['debt_service_ratio']['percentage'] = f"{dsr_value:.1f}%"
+            metrics['debt_service_ratio']['calculation']['existing_commitments'] = total_debt
+            metrics['debt_service_ratio']['calculation']['estimated_new_installment'] = round(new_installment, 2)
+            metrics['debt_service_ratio']['calculation']['net_monthly_income'] = net_income
+            
+            if dsr_value < 40:
+                metrics['debt_service_ratio']['assessment'] = "Low Risk (<40%)"
+            elif dsr_value <= 60:
+                metrics['debt_service_ratio']['assessment'] = "Moderate Risk (40-60%)"
+            else:
+                metrics['debt_service_ratio']['assessment'] = "High Risk (>60%)"
+
+            # 2. Net Disposable Income (NDI)
+            # Formula: Net Monthly Income - Total Monthly Debt - New Installment - Living Expenses
+            ndi_value = net_income - total_debt - new_installment - living_expenses
+            
+            metrics['net_disposable_income']['value'] = round(ndi_value, 2)
+            metrics['net_disposable_income']['calculation']['net_income'] = net_income
+            metrics['net_disposable_income']['calculation']['total_debt_commitments'] = total_debt + new_installment
+            metrics['net_disposable_income']['calculation']['estimated_living_expenses'] = living_expenses
+            
+            if ndi_value > 2000:
+                metrics['net_disposable_income']['assessment'] = "Sufficient Buffer (>RM2000)"
+            elif ndi_value >= 1000:
+                metrics['net_disposable_income']['assessment'] = "Tight (RM1000-2000)"
+            else:
+                metrics['net_disposable_income']['assessment'] = "Critical (<RM1000)"
+
+            # 3. Loan-To-Value (LTV)
+            ltv_value = 0.0
+            if asset_value > 0:
+                ltv_value = (loan_amount / asset_value) * 100
+            
+            metrics['loan_to_value_ratio']['value'] = round(ltv_value, 2)
+            metrics['loan_to_value_ratio']['percentage'] = f"{ltv_value:.1f}%"
+            metrics['loan_to_value_ratio']['calculation']['loan_amount'] = loan_amount
+            metrics['loan_to_value_ratio']['calculation']['asset_value'] = asset_value
+
+            # 4. Per Capita Income
+            per_capita = 0.0
+            if family_members > 0:
+                per_capita = net_income / family_members
+            
+            metrics['per_capita_income']['value'] = round(per_capita, 2)
+            metrics['per_capita_income']['calculation']['net_monthly_income'] = net_income
+            metrics['per_capita_income']['calculation']['family_members'] = family_members
+            
+            if per_capita > 2000:
+                metrics['per_capita_income']['assessment'] = "Comfortable (>RM2000)"
+            elif per_capita >= 1000:
+                metrics['per_capita_income']['assessment'] = "Moderate (RM1000-2000)"
+            else:
+                metrics['per_capita_income']['assessment'] = "Struggling (<RM1000)"
+
+            # 5. Savings Rate
+            savings_rate = 0.0
+            if net_income > 0:
+                savings_rate = (closing_balance / net_income) * 100
+            
+            metrics['savings_rate']['value'] = round(savings_rate, 2)
+            metrics['savings_rate']['percentage'] = f"{savings_rate:.1f}%"
+            metrics['savings_rate']['calculation']['monthly_closing_balance'] = closing_balance
+            metrics['savings_rate']['calculation']['monthly_income'] = net_income
+            
+            if savings_rate > 50:
+                metrics['savings_rate']['assessment'] = "High Saver (>50%)"
+            elif savings_rate >= 20:
+                metrics['savings_rate']['assessment'] = "Moderate (20-50%)"
+            else:
+                metrics['savings_rate']['assessment'] = "Low Saver (<20%)"
+
+            # 6. Cost of Living Ratio
+            col_ratio = 0.0
+            if net_income > 0:
+                col_ratio = (living_expenses / net_income) * 100
+            
+            metrics['cost_of_living_ratio']['value'] = round(col_ratio, 2)
+            metrics['cost_of_living_ratio']['percentage'] = f"{col_ratio:.1f}%"
+            metrics['cost_of_living_ratio']['calculation']['total_living_expenses'] = living_expenses
+            metrics['cost_of_living_ratio']['calculation']['net_income'] = net_income
+            
+            if col_ratio < 30:
+                metrics['cost_of_living_ratio']['assessment'] = "Frugal (<30%)"
+            elif col_ratio <= 50:
+                metrics['cost_of_living_ratio']['assessment'] = "Moderate (30-50%)"
+            else:
+                metrics['cost_of_living_ratio']['assessment'] = "High (>50%)"
+            
+            result['financial_metrics'] = metrics
+            print("[AI ENGINE] Financial metrics recalculated successfully")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to recalculate metrics: {e}")
+            # Don't fail the whole process, just keep AI values if calculation fails
+            
+        return result
