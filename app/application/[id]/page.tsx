@@ -261,6 +261,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     risk_score?: number;
     risk_level?: string;
     final_decision?: string;
+    decision_justification?: string;
     key_findings?: RiskFlag[];
     key_risk_flags?: RiskFlag[];
     behavioral_insights?: BehavioralInsight[];
