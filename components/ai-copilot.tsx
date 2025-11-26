@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { MessageSquare, X, Send, Bot, FileText, GripHorizontal, Maximize2 } from "lucide-react"
+import { MessageSquare, X, Send, Bot, FileText, GripHorizontal, Maximize2, Minimize2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface Message {
@@ -20,6 +20,7 @@ interface AICopilotProps {
 
 export function AICopilot({ applicationId }: AICopilotProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: "assistant", 
@@ -43,9 +44,18 @@ export function AICopilot({ applicationId }: AICopilotProps) {
 
   // Handle Button Drag
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isOpen) return // Don't drag button if window is open (window replaces button)
-    isDragging.current = true
-    dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    if (isOpen && isMaximized) return // Don't drag if maximized
+    if (isOpen) {
+        // Window drag logic
+        isDragging.current = true
+        // Calculate offset from the top-left of the window
+        // Note: position.x/y tracks the top-left of the window when open
+        dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    } else {
+        // Button drag logic
+        isDragging.current = true
+        dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    }
   }
 
   // Handle Window Resize
@@ -152,7 +162,14 @@ export function AICopilot({ applicationId }: AICopilotProps) {
   }
 
   // Calculate window position to keep it on screen
-  const windowStyle = {
+  const windowStyle = isMaximized ? {
+    left: 0,
+    top: 0,
+    width: '100vw',
+    height: '100vh',
+    borderRadius: 0,
+    zIndex: 9999 // Ensure it's on top of everything
+  } : {
     left: Math.min(position.x, window.innerWidth - size.width - 20),
     top: Math.min(position.y, window.innerHeight - size.height - 20),
     width: size.width,
@@ -171,10 +188,6 @@ export function AICopilot({ applicationId }: AICopilotProps) {
             className="h-14 w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white cursor-move transition-transform active:scale-95"
             onMouseDown={handleMouseDown}
             onClick={(e) => {
-              // Only open if not dragging (simple check: if mouse didn't move much)
-              // For now, let's just rely on the fact that a click is short.
-              // But we need to distinguish.
-              // Let's use a simple flag that is set to true on mouse down and false on mouse move.
               if (!isDragging.current) setIsOpen(true)
             }}
           >
@@ -185,11 +198,11 @@ export function AICopilot({ applicationId }: AICopilotProps) {
 
       {isOpen && (
         <Card 
-          className="fixed shadow-2xl flex flex-col z-50 bg-white"
+          className={`fixed shadow-2xl flex flex-col z-50 bg-white ${isMaximized ? '' : 'rounded-lg'}`}
           style={windowStyle}
         >
           <CardHeader 
-            className="bg-blue-600 text-white rounded-t-lg flex flex-row items-center justify-between py-3 cursor-move"
+            className={`bg-blue-600 text-white flex flex-row items-center justify-between py-3 ${isMaximized ? '' : 'rounded-t-lg cursor-move'}`}
             onMouseDown={handleMouseDown} // Allow dragging by header
           >
             <div className="flex items-center pointer-events-none">
@@ -197,7 +210,14 @@ export function AICopilot({ applicationId }: AICopilotProps) {
               <CardTitle className="text-base">TrustLens Copilot</CardTitle>
             </div>
             <div className="flex items-center gap-1">
-               {/* Resize Handle (Visual only in header, actual resize is bottom-right) */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-white hover:bg-blue-700 h-8 w-8" 
+                onClick={() => setIsMaximized(!isMaximized)}
+              >
+                {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
               <Button variant="ghost" size="icon" className="text-white hover:bg-blue-700 h-8 w-8" onClick={() => setIsOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
@@ -212,7 +232,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
                     className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap select-text ${
                         msg.role === "user"
                           ? "bg-blue-600 text-white"
                           : "bg-slate-100 text-slate-900"
@@ -302,14 +322,16 @@ export function AICopilot({ applicationId }: AICopilotProps) {
               </Button>
             </div>
             {/* Resize Handle */}
-            <div 
-              className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-center justify-center opacity-50 hover:opacity-100"
-              onMouseDown={handleResizeStart}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 0V10H0L10 0Z" fill="#94a3b8"/>
-              </svg>
-            </div>
+            {!isMaximized && (
+              <div 
+                className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-center justify-center opacity-50 hover:opacity-100"
+                onMouseDown={handleResizeStart}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 0V10H0L10 0Z" fill="#94a3b8"/>
+                </svg>
+              </div>
+            )}
           </CardFooter>
         </Card>
       )}
