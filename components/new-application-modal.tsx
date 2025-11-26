@@ -131,30 +131,30 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">
           <Plus className="mr-2 h-4 w-4" /> New Application
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>New Loan Application</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-bold text-slate-900">New Loan Application</DialogTitle>
+          <DialogDescription className="text-slate-600">
             Ingest new loan applications for AI processing.
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="single" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="single">Single Entry</TabsTrigger>
-            <TabsTrigger value="batch">Batch Upload</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1 rounded-lg">
+            <TabsTrigger value="single" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm rounded-md font-semibold">Single Entry</TabsTrigger>
+            <TabsTrigger value="batch" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm rounded-md font-semibold">Batch Upload</TabsTrigger>
           </TabsList>
           <TabsContent value="single" className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-2">
             <div className="space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <FileText className="w-5 h-5 text-indigo-600 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-blue-900 text-sm">AI-Powered Application Processing</h4>
-                    <p className="text-xs text-blue-700 mt-1">
+                    <h4 className="font-bold text-indigo-900 text-sm">AI-Powered Application Processing</h4>
+                    <p className="text-xs text-indigo-700 mt-1">
                       Upload 4 required documents. AI will automatically extract applicant information from the Application Form.
                     </p>
                   </div>
@@ -163,8 +163,8 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">1</span>
+                  <Label className="flex items-center gap-2 text-slate-700 font-semibold">
+                    <span className="bg-indigo-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">1</span>
                     Application Form (PDF) *
                   </Label>
                   <Input
@@ -174,16 +174,16 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {applicationForm && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {applicationForm.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500">Official loan application form with applicant details</p>
+                  <p className="text-xs text-slate-500 font-medium">Official loan application form with applicant details</p>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">2</span>
+                  <Label className="flex items-center gap-2 text-slate-700 font-semibold">
+                    <span className="bg-indigo-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">2</span>
                     Bank Statement (PDF) *
                   </Label>
                   <Input
@@ -193,16 +193,16 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {bankStatement && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {bankStatement.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500">Recent bank account transaction history</p>
+                  <p className="text-xs text-slate-500 font-medium">Recent bank account transaction history</p>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">3</span>
+                  <Label className="flex items-center gap-2 text-slate-700 font-semibold">
+                    <span className="bg-indigo-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">3</span>
                     Loan Essay (PDF) *
                   </Label>
                   <Input
@@ -212,16 +212,16 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {essay && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {essay.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500">Applicant's written explanation of loan purpose</p>
+                  <p className="text-xs text-slate-500 font-medium">Applicant's written explanation of loan purpose</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-emerald-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">4</span>
+                  <Label className="flex items-center gap-2 text-slate-700 font-semibold">
+                    <span className="bg-indigo-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">4</span>
                     Payslip (PDF) *
                   </Label>
                   <Input
@@ -231,16 +231,16 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {payslip && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {payslip.name}
                     </p>
                   )}
-                  <p className="text-xs text-slate-500">Recent salary slip for income verification</p>
+                  <p className="text-xs text-slate-500 font-medium">Recent salary slip for income verification</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">5</span>
+                  <Label className="flex items-center gap-2 text-slate-600 font-semibold">
+                    <span className="bg-slate-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">5</span>
                     Supporting Document 1 (Optional)
                   </Label>
                   <Input
@@ -250,15 +250,15 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {supportingDoc1 && (
-                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <p className="text-xs text-indigo-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {supportingDoc1.name}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">6</span>
+                  <Label className="flex items-center gap-2 text-slate-600 font-semibold">
+                    <span className="bg-slate-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">6</span>
                     Supporting Document 2 (Optional)
                   </Label>
                   <Input
@@ -268,15 +268,15 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {supportingDoc2 && (
-                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <p className="text-xs text-indigo-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {supportingDoc2.name}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">7</span>
+                  <Label className="flex items-center gap-2 text-slate-600 font-semibold">
+                    <span className="bg-slate-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">7</span>
                     Supporting Document 3 (Optional)
                   </Label>
                   <Input
@@ -286,7 +286,7 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     className="cursor-pointer"
                   />
                   {supportingDoc3 && (
-                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                    <p className="text-xs text-indigo-600 font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> {supportingDoc3.name}
                     </p>
                   )}
@@ -348,7 +348,7 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
 
               <div className="flex justify-end pt-4">
                 <Button 
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
                   onClick={handleBatchSubmit}
                   disabled={loading || !batchFile}
                 >
@@ -396,7 +396,7 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
               </Button>
               {applicationId && (
                 <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
                   onClick={() => {
                     setShowSuccess(false)
                     router.push(`/application/${applicationId}`)

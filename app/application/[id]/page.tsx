@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { AICopilot } from "@/components/ai-copilot"
-import { AlertTriangle, CheckCircle, Shield, AlertCircle, TrendingUp, Building2, Calendar, Banknote, Terminal, Zap, Download, ChevronLeft, ChevronRight, Bot, User, MessageSquare, FileText } from "lucide-react"
+import { AlertTriangle, CheckCircle, Shield, AlertCircle, TrendingUp, Building2, Calendar, Banknote, Terminal, Zap, Download, ChevronLeft, ChevronRight, Bot, User, MessageSquare, FileText, ArrowLeft } from "lucide-react"
 import { api, type ApplicationDetail } from "@/lib/api"
 import { use } from "react"
+import Link from "next/link"
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -512,7 +513,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         logs.push({ time: `00:0${7 + findings.length}`, message: `Cross-verification: ${crossVerif.status}`, type: crossVerif.status === 'Verified' ? 'success' : 'warning' })
       }
       
-      logs.push({ time: `00:0${8 + findings.length}`, message: `Analysis complete. Final Risk Score: ${riskScore}/100 (${riskLevel})`, type: 'success' })
+      logs.push({ time: `00:0${8 + findings.length}`, message: `Analysis complete. Final Credit Score: ${riskScore}/100 (${riskLevel})`, type: 'success' })
     } else {
       logs.push({ time: '00:02', message: 'Waiting for AI analysis...', type: 'info' })
     }
@@ -559,7 +560,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 25, 79)
       doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 61)
       
-      // Risk Score - Professional Box
+      // Credit Score - Professional Box
       doc.setDrawColor(0, 0, 0)
       doc.setLineWidth(0.8)
       doc.rect(20, 95, 60, 25)
@@ -569,7 +570,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.text(riskScore.toString(), 50, 110, { align: 'center' })
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
-      doc.text('RISK SCORE (/100)', 50, 117, { align: 'center' })
+      doc.text('CREDIT SCORE (/100)', 50, 117, { align: 'center' })
       
       // Decision Box - Professional Format
       doc.setDrawColor(0, 0, 0)
@@ -587,7 +588,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       let yPos = 140
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text('Risk Score Calculation Breakdown', 20, yPos)
+      doc.text('Credit Score Calculation Breakdown', 20, yPos)
 
       if (scoreBreakdown && scoreBreakdown.length > 0) {
         autoTable(doc, {
@@ -839,83 +840,89 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         <div className="space-y-3">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
+              {/* Back Button + Name */}
               <div className="flex items-center gap-3">
+                <Link href="/">
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-slate-100">
+                    <ArrowLeft className="h-5 w-5 text-slate-600" />
+                  </Button>
+                </Link>
                 <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
                 
                 {/* Review Status Badge */}
                 {appData.review_status === "Manual_Override" ? (
-                  <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                  <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
                     <AlertCircle className="h-3 w-3 mr-1" />
                     Manual Override
                   </Badge>
                 ) : appData.review_status === "Human_Verified" ? (
-                  <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200">
                     <User className="h-3 w-3 mr-1" />
                     Verified
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-slate-600 border-slate-300">
+                  <Badge variant="outline" className="bg-white text-slate-600 border-slate-300">
                     <Bot className="h-3 w-3 mr-1" />
                     AI Analysis
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-500">ID: {resolvedParams.id}</p>
+              <p className="text-sm text-slate-500 font-medium ml-12">Application ID: {resolvedParams.id}</p>
               
               {/* Last Reviewed Timestamp */}
               {appData.reviewed_at && (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 ml-12">
                   Last reviewed by {appData.reviewed_by} at {new Date(appData.reviewed_at).toLocaleString()}
                 </p>
               )}
               
               {/* Decision & Risk Level Badges */}
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-3 mt-3 ml-12">
                 {/* Large Risk Score Display */}
-                <div className={`px-4 py-2 rounded-lg border-2 ${
-                  riskScore >= 80 ? 'bg-emerald-50 border-emerald-300' :
-                  riskScore >= 60 ? 'bg-amber-50 border-amber-300' :
-                  'bg-rose-50 border-rose-300'
+                <div className={`px-5 py-3 rounded-xl border-2 ${
+                  riskScore >= 80 ? 'bg-emerald-50 border-emerald-200' :
+                  riskScore >= 60 ? 'bg-amber-50 border-amber-200' :
+                  'bg-rose-50 border-rose-200'
                 }`}>
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-3xl font-bold tabular-nums ${
-                      riskScore >= 80 ? 'text-emerald-700' :
-                      riskScore >= 60 ? 'text-amber-700' :
-                      'text-rose-700'
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-4xl font-bold tabular-nums tracking-tight ${
+                      riskScore >= 80 ? 'text-emerald-600' :
+                      riskScore >= 60 ? 'text-amber-600' :
+                      'text-rose-600'
                     }`}>
                       {riskScore}
                     </span>
-                    <span className="text-xs text-slate-500 font-medium">/100</span>
+                    <span className="text-sm text-slate-500 font-semibold">/100</span>
                   </div>
-                  <p className="text-[10px] text-slate-600 font-medium mt-0.5">RISK SCORE</p>
+                  <p className="text-xs text-slate-600 font-semibold mt-1 uppercase tracking-wide">Credit Score</p>
                   {isPolling && (
-                    <div className="mt-1 flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
-                      <span className="text-[10px] text-blue-600 font-medium">Analyzing...</span>
+                    <div className="mt-2 flex items-center gap-1">
+                      <div className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                      <span className="text-xs text-indigo-600 font-semibold">Analyzing...</span>
                     </div>
                   )}
                 </div>
                 
-                <Badge className={`${
-                  finalDecision === 'Approved' ? 'bg-emerald-600 text-white border-emerald-500' :
-                  finalDecision === 'Rejected' ? 'bg-rose-600 text-white border-rose-500' :
-                  'bg-amber-600 text-white border-amber-500'
+                <Badge className={`text-sm py-1.5 px-3 ${
+                  finalDecision === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                  finalDecision === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                  'bg-amber-50 text-amber-700 border border-amber-200'
                 }`}>
                   {finalDecision}
                 </Badge>
-                <Badge variant="outline" className={`${
-                  riskLevel === 'Low' ? 'text-emerald-700 border-emerald-300' :
-                  riskLevel === 'High' ? 'text-rose-700 border-rose-300' :
-                  'text-amber-700 border-amber-300'
+                <Badge variant="outline" className={`text-sm py-1.5 px-3 ${
+                  riskLevel === 'Low' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
+                  riskLevel === 'High' ? 'text-rose-700 border-rose-200 bg-rose-50' :
+                  'text-amber-700 border-amber-200 bg-amber-50'
                 }`}>
                   Risk: {riskLevel}
                 </Badge>
               </div>
               
               {/* Metadata Badges Row - Dynamic from Application Form */}
-              <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-3 mt-3 ml-12">
                 {appData.requested_amount && typeof appData.requested_amount === 'number' && (
-                  <Badge variant="outline" className="text-slate-700 border-slate-300 bg-slate-50">
+                  <Badge variant="outline" className="text-slate-700 border-slate-200 bg-white">
                     <Banknote className="h-3 w-3 mr-1" />
                     Requested: RM {appData.requested_amount.toLocaleString()}
                   </Badge>
@@ -941,13 +948,13 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               <div className="flex items-center space-x-2">
                 <Button 
                   variant="outline" 
-                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
                   onClick={handleExportPDF}
                   disabled={isExporting}
                 >
                   {isExporting ? (
                     <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
                       Exporting...
                     </>
                   ) : (
@@ -1004,7 +1011,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
                     onClick={() => setShowSendEmailDialog(true)}
                   >
                     <MessageSquare className="mr-1 h-3 w-3" />
@@ -1069,17 +1076,17 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Applicant Information Card - Moved to Top */}
         {analysis?.applicant_profile && (
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
+          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-slate-900 flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" />
+                    <User className="h-5 w-5 text-indigo-600" />
                     Applicant Information
                   </CardTitle>
                   <CardDescription>Extracted from Application Form by AI</CardDescription>
                 </div>
-                <Badge variant="outline" className="bg-white text-blue-700 border-blue-300">
+                <Badge variant="outline" className="bg-white text-indigo-700 border-indigo-300">
                   <Bot className="h-3 w-3 mr-1" />
                   AI Extracted
                 </Badge>
@@ -1109,7 +1116,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase">Loan Type</p>
-                    <Badge className="mt-1 bg-blue-600 text-white">
+                    <Badge className="mt-1 bg-indigo-600 text-white">
                       {analysis.applicant_profile.loan_type || 'N/A'}
                     </Badge>
                   </div>
@@ -1131,7 +1138,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
                 
-                <div className="col-span-2 space-y-3 pt-3 border-t border-blue-200">
+                <div className="col-span-2 space-y-3 pt-3 border-t border-indigo-200">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase">Address</p>
                     <p className="text-sm text-slate-900">{analysis.applicant_profile.address || 'N/A'}</p>
@@ -1174,9 +1181,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             <CardHeader>
               <CardTitle className="text-slate-900 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-slate-600" />
-                Risk Score Calculation Breakdown
+                Credit Score Calculation Breakdown
               </CardTitle>
-              <CardDescription>Transparent scoring showing how the {riskScore}/100 risk score was calculated</CardDescription>
+              <CardDescription>Transparent scoring showing how the {riskScore}/100 credit score was calculated</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -1211,7 +1218,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                 
                 <div className="mt-4 p-3 bg-slate-800 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-white">TOTAL RISK SCORE</span>
+                    <span className="text-sm font-semibold text-white">TOTAL CREDIT SCORE</span>
                     <span className="text-3xl font-bold text-white">{riskScore}/100</span>
                   </div>
                   <p className="text-xs text-slate-400 mt-2">
@@ -1393,7 +1400,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                         </p>
                       </div>
                       {analysis.financial_metrics.net_disposable_income.after_living_costs && (
-                        <p className="text-blue-600 font-medium mt-2">
+                        <p className="text-indigo-600 font-medium mt-2">
                           Real Buffer: RM {(analysis.financial_metrics.net_disposable_income.after_living_costs ?? 0).toLocaleString()}
                         </p>
                       )}
@@ -1414,7 +1421,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                         {analysis.financial_metrics.per_capita_income.assessment}
                       </Badge>
                     </div>
-                    <p className="text-3xl font-bold text-blue-700 mb-2">
+                    <p className="text-3xl font-bold text-indigo-700 mb-2">
                       RM {(analysis.financial_metrics.per_capita_income.value ?? 0).toLocaleString()}
                     </p>
                     <div className="text-xs text-slate-600 space-y-1">
@@ -1700,17 +1707,17 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         )}
 
         {/* AI Reasoning Stream */}
-        <Card className="border-t-4 border-t-blue-500 bg-slate-900 text-white">
+        <Card className="border-t-4 border-t-indigo-500 bg-slate-900 text-white">
           <CardHeader 
             className="pb-2 cursor-pointer hover:bg-slate-800 transition-colors"
             onClick={() => setShowReasoningStream(!showReasoningStream)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-blue-400" />
+                <Terminal className="h-4 w-4 text-indigo-400" />
                 <CardTitle className="text-sm text-white">AI Reasoning Stream</CardTitle>
               </div>
-              <Badge className="bg-blue-600 text-white border-blue-500 text-xs">
+              <Badge className="bg-indigo-600 text-white border-indigo-500 text-xs">
                 {showReasoningStream ? "Hide" : "Show"} Logs
               </Badge>
             </div>
@@ -1746,7 +1753,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* AI Summary Section */}
         {analysis && analysis.ai_summary && (
-          <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 shadow-sm">
+          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 shadow-sm">
             <CardHeader>
               <CardTitle className="text-slate-900 flex items-center gap-2">
                 <Bot className="h-5 w-5 text-indigo-600" />
@@ -1850,7 +1857,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
       {/* Resizable Handle */}
       <div
-        className="w-4 cursor-col-resize flex items-center justify-center hover:bg-slate-100 active:bg-blue-100 transition-colors z-10"
+        className="w-4 cursor-col-resize flex items-center justify-center hover:bg-slate-100 active:bg-indigo-100 transition-colors z-10"
         onMouseDown={handleMouseDown}
       >
         <div className="w-1 h-8 bg-slate-300 rounded-full" />
@@ -2072,7 +2079,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               </Alert>
             ) : (
               <>
-                <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+                <div className="bg-indigo-50 p-4 rounded-lg space-y-2">
                   <p className="text-sm font-semibold text-slate-900">Email Details:</p>
                   <ul className="text-xs text-slate-700 space-y-1">
                     <li><strong>Recipient:</strong> {appData?.analysis_result && typeof appData.analysis_result === 'object' ? 

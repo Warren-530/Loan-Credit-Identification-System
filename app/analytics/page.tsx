@@ -73,7 +73,7 @@ interface AnalyticsData {
   }
 }
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+const CHART_COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           <p className="text-sm font-medium text-slate-600">Loading Analytics Dashboard...</p>
         </div>
       </div>
@@ -144,8 +144,8 @@ export default function AnalyticsPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Applications</p>
-              <div className="h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-600" />
+              <div className="h-9 w-9 bg-indigo-50 rounded-lg flex items-center justify-center">
+                <Users className="h-4 w-4 text-indigo-600" />
               </div>
             </div>
             <h3 className="text-2xl font-bold text-slate-900">{data.kpi.total_applications}</h3>
@@ -230,8 +230,8 @@ export default function AnalyticsPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">AI Accuracy</p>
-              <div className="h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center">
-                <FileCheck className="h-4 w-4 text-blue-600" />
+              <div className="h-9 w-9 bg-indigo-50 rounded-lg flex items-center justify-center">
+                <FileCheck className="h-4 w-4 text-indigo-600" />
               </div>
             </div>
             <h3 className="text-2xl font-bold text-slate-900">{data.kpi.ai_human_agreement}%</h3>
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
                   />
                   <Bar 
                     dataKey="count" 
-                    fill="#3b82f6" 
+                    fill="#4f46e5" 
                     radius={[6, 6, 0, 0]} 
                     maxBarSize={60}
                   />
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
                     />
                     <Bar 
                       dataKey="count" 
-                      fill="#3b82f6" 
+                      fill="#4f46e5" 
                       radius={[0, 4, 4, 0]}
                       maxBarSize={32}
                     />
@@ -421,7 +421,7 @@ export default function AnalyticsPage() {
                             idx === 0 ? 'bg-rose-500' :
                             idx === 1 ? 'bg-orange-500' :
                             idx === 2 ? 'bg-amber-500' :
-                            idx === 3 ? 'bg-yellow-500' : 'bg-blue-500'
+                            idx === 3 ? 'bg-yellow-500' : 'bg-indigo-500'
                           }`}
                           style={{ width: `${percentage}%` }} 
                         />
@@ -586,7 +586,7 @@ export default function AnalyticsPage() {
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-6 p-5 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mt-6 p-5 bg-indigo-50 border border-indigo-200 rounded-lg">
               <p className="text-xs text-slate-700 leading-relaxed">
                 <strong>Insight:</strong> Applications clustered in the top-left quadrant (low income, high DSR) represent the highest risk segment. 
                 The reference line at 60% DSR marks the critical threshold - data points above this line require enhanced scrutiny.
@@ -603,7 +603,7 @@ export default function AnalyticsPage() {
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
+                <Calendar className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg font-semibold text-slate-900">Application Trends Over Time</CardTitle>
               </div>
               <CardDescription className="text-xs text-slate-500">
@@ -649,7 +649,7 @@ export default function AnalyticsPage() {
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Bar yAxisId="left" dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Total Apps" />
+                    <Bar yAxisId="left" dataKey="total" fill="#4f46e5" radius={[4, 4, 0, 0]} name="Total Apps" />
                     <Bar yAxisId="left" dataKey="approved" fill="#10b981" radius={[4, 4, 0, 0]} name="Approved" />
                     <Bar yAxisId="left" dataKey="rejected" fill="#ef4444" radius={[4, 4, 0, 0]} name="Rejected" />
                     <Line 

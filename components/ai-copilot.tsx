@@ -185,7 +185,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
         >
           <Button
             ref={buttonRef}
-            className="h-14 w-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white cursor-move transition-transform active:scale-95"
+            className="h-14 w-14 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white cursor-move transition-transform active:scale-95"
             onMouseDown={handleMouseDown}
             onClick={(e) => {
               if (!isDragging.current) setIsOpen(true)
@@ -202,7 +202,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
           style={windowStyle}
         >
           <CardHeader 
-            className={`bg-blue-600 text-white flex flex-row items-center justify-between py-3 ${isMaximized ? '' : 'rounded-t-lg cursor-move'}`}
+            className={`bg-indigo-600 text-white flex flex-row items-center justify-between py-3 ${isMaximized ? '' : 'rounded-t-lg cursor-move'}`}
             onMouseDown={handleMouseDown} // Allow dragging by header
           >
             <div className="flex items-center pointer-events-none">
@@ -213,12 +213,12 @@ export function AICopilot({ applicationId }: AICopilotProps) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="text-white hover:bg-blue-700 h-8 w-8" 
+                className="text-white hover:bg-indigo-700 h-8 w-8" 
                 onClick={() => setIsMaximized(!isMaximized)}
               >
                 {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-blue-700 h-8 w-8" onClick={() => setIsOpen(false)}>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-indigo-700 h-8 w-8" onClick={() => setIsOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -234,7 +234,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
                     <div
                       className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap !select-text cursor-text ${
                         msg.role === "user"
-                          ? "bg-blue-600 text-white"
+                          ? "bg-indigo-600 text-white"
                           : "bg-slate-100 text-slate-900"
                       }`}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -250,7 +250,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
                             if (line.trim().startsWith('* ')) {
                               return (
                                 <div key={idx} className="flex gap-2 ml-2">
-                                  <span className="text-blue-600 font-bold">•</span>
+                                  <span className="text-indigo-600 font-bold">•</span>
                                   <span className="flex-1">{line.trim().substring(2)}</span>
                                 </div>
                               )
@@ -294,7 +294,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
                   <div className="flex items-start">
                     <div className="bg-slate-100 text-slate-900 rounded-lg px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                        <div className="h-2 w-2 rounded-full bg-indigo-600 animate-ping" />
                         <span>Analyzing documents...</span>
                       </div>
                     </div>
@@ -316,7 +316,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
               <Button 
                 size="icon" 
                 onClick={handleSend} 
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-indigo-600 hover:bg-indigo-700"
                 disabled={isLoading || !input.trim()}
               >
                 <Send className="h-4 w-4" />

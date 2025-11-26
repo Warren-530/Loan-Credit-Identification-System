@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -78,9 +79,18 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-emerald-50 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Image 
+              src="/logo.png" 
+              alt="InsightLoan Logo" 
+              width={80} 
+              height={80}
+              className="h-20 w-20 object-contain"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-slate-900 mb-2">InsightLoan</h1>
           <p className="text-slate-600">Intelligent Loan Application System</p>
         </div>
@@ -174,7 +184,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => setShowForgotPassword(true)}
-                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                        className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline"
                       >
                         Forgot password?
                       </button>

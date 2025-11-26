@@ -350,7 +350,7 @@ export default function SettingsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
           <p className="text-sm font-medium text-slate-600">Loading Settings...</p>
         </div>
       </div>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
-                <Sliders className="h-5 w-5 text-blue-600" />
+                <Sliders className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg font-semibold text-slate-900">Risk Policy Configuration</CardTitle>
                 <Badge className="bg-emerald-500 text-white text-xs">Active</Badge>
               </div>
@@ -393,7 +393,7 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-slate-700">Maximum DSR Threshold</Label>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 font-mono">
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 font-mono">
                     {policy.dsr_threshold}%
                   </Badge>
                 </div>
@@ -675,9 +675,9 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Simulation Result Display */}
             {showSimulation && (
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
                 <div className="flex items-start gap-3">
-                  <Activity className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <Activity className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm font-bold text-slate-900 mb-2">Decision Intelligence Simulation</p>
                     <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans">{simulationResult}</pre>
@@ -762,7 +762,7 @@ export default function SettingsPage() {
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
-                <FileDown className="h-5 w-5 text-blue-600" />
+                <FileDown className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg font-semibold text-slate-900">Export Applications</CardTitle>
               </div>
               <CardDescription className="text-xs text-slate-500">
@@ -833,7 +833,7 @@ export default function SettingsPage() {
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-600" />
+                <User className="h-5 w-5 text-indigo-600" />
                 <CardTitle className="text-lg font-semibold text-slate-900">Account Settings</CardTitle>
               </div>
               <CardDescription className="text-xs text-slate-500">
@@ -843,7 +843,7 @@ export default function SettingsPage() {
             <CardContent className="pt-6 space-y-4">
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg">
+                  <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
                     {getInitials(user?.displayName || null)}
                   </div>
                   <div className="flex-1">
@@ -859,7 +859,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-600">Account Type</span>
-                    <Badge className="bg-blue-600 text-white">Premium</Badge>
+                    <Badge className="bg-indigo-600 text-white">Premium</Badge>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-600">Member Since</span>
@@ -880,7 +880,7 @@ export default function SettingsPage() {
               </Button>
 
               {showChangePassword && (
-                <form onSubmit={handleChangePassword} className="space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <form onSubmit={handleChangePassword} className="space-y-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                   <div className="space-y-2">
                     <Label htmlFor="current-password" className="text-xs">Current Password</Label>
                     <Input
@@ -1073,10 +1073,10 @@ export default function SettingsPage() {
               </div>
 
               {/* Failure Retry Info */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-blue-900">
+                  <Shield className="h-4 w-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-indigo-900">
                     <p className="font-semibold">Retry on Failure</p>
                     <p className="mt-1">If email fails, a notification will appear with option to retry sending</p>
                   </div>
@@ -1126,9 +1126,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Footer Info */}
-      <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
         <div className="flex items-start gap-3">
-          <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <Shield className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-slate-900">Settings Auto-Save</p>
             <p className="text-xs text-slate-600 mt-1">

@@ -33,7 +33,7 @@ export function NotificationCenter() {
       case 'success': return <Check className="h-4 w-4 text-emerald-600" />
       case 'error': return <AlertCircle className="h-4 w-4 text-rose-600" />
       case 'warning': return <AlertCircle className="h-4 w-4 text-amber-600" />
-      default: return <FileText className="h-4 w-4 text-blue-600" />
+      default: return <FileText className="h-4 w-4 text-indigo-600" />
     }
   }
 
@@ -111,7 +111,7 @@ export function NotificationCenter() {
                   variant="ghost"
                   size="sm"
                   onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-700"
+                  className="text-xs text-indigo-600 hover:text-indigo-700"
                 >
                   Mark all as read
                 </Button>
@@ -130,7 +130,7 @@ export function NotificationCenter() {
                     <div
                       key={notification.id}
                       className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${
-                        !notification.read ? 'bg-blue-50/50' : ''
+                        !notification.read ? 'bg-indigo-50/50' : ''
                       }`}
                       onClick={() => {
                         if (notification.link) {
@@ -143,7 +143,7 @@ export function NotificationCenter() {
                         <div className={`p-2 rounded-lg flex-shrink-0 ${
                           notification.type === 'success' ? 'bg-emerald-100' :
                           notification.type === 'error' ? 'bg-rose-100' :
-                          notification.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
+                          notification.type === 'warning' ? 'bg-amber-100' : 'bg-indigo-100'
                         }`}>
                           {getIcon(notification.type)}
                         </div>
@@ -153,7 +153,7 @@ export function NotificationCenter() {
                               {notification.title}
                             </p>
                             {!notification.read && (
-                              <div className="h-2 w-2 rounded-full bg-blue-600 flex-shrink-0 mt-1" />
+                              <div className="h-2 w-2 rounded-full bg-indigo-600 flex-shrink-0 mt-1" />
                             )}
                           </div>
                           <p className="text-xs text-slate-600 line-clamp-2 mb-1">
@@ -174,7 +174,7 @@ export function NotificationCenter() {
             <div className="p-2 border-t">
               <Button
                 variant="ghost"
-                className="w-full justify-start text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                className="w-full justify-start text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
                 onClick={() => {
                   window.location.href = '/settings'
                   setOpen(false)

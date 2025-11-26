@@ -1,6 +1,6 @@
 @echo off
 echo ================================================
-echo   TrustLens AI - Starting Servers
+echo   InsightLoan AI - Starting Servers
 echo ================================================
 echo.
 
@@ -13,14 +13,14 @@ timeout /t 2 /nobreak >nul
 echo.
 echo Starting Backend Server (Port 8000)...
 cd /d "%~dp0backend"
-start "TrustLens Backend" cmd /k "venv\Scripts\activate && python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+start "InsightLoan Backend" cmd /k "venv\Scripts\activate && python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
 
 timeout /t 3 /nobreak >nul
 
 echo.
 echo Starting Frontend Server (Port 3000)...
 cd /d "%~dp0"
-start "TrustLens Frontend" cmd /k "npm run dev"
+start "InsightLoan Frontend" cmd /k "npm run dev"
 
 timeout /t 8 /nobreak >nul
 

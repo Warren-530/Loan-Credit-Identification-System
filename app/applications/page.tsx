@@ -91,7 +91,7 @@ export default function ApplicationsPage() {
 
     // Review status filter
     if (reviewStatusFilters.size > 0) {
-      result = result.filter(app => reviewStatusFilters.has(app.review_status))
+      result = result.filter(app => app.review_status && reviewStatusFilters.has(app.review_status))
     }
 
     // Loan type filter
@@ -298,7 +298,7 @@ export default function ApplicationsPage() {
         doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 25, 79)
         doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 61)
         
-        // Risk Score Section - Professional Box
+        // Credit Score Section - Professional Box
         doc.setDrawColor(0, 0, 0)
         doc.setLineWidth(0.8)
         doc.rect(20, 95, 60, 25)
@@ -308,7 +308,7 @@ export default function ApplicationsPage() {
         doc.text(riskScore.toString(), 50, 110, { align: 'center' })
         doc.setFontSize(9)
         doc.setFont('helvetica', 'normal')
-        doc.text('RISK SCORE (/100)', 50, 117, { align: 'center' })
+        doc.text('CREDIT SCORE (/100)', 50, 117, { align: 'center' })
         
         // Decision Section - Professional Box
         doc.setDrawColor(0, 0, 0)
@@ -326,7 +326,7 @@ export default function ApplicationsPage() {
         let yPos = 140
         doc.setFontSize(14)
         doc.setFont('helvetica', 'bold')
-        doc.text('Risk Score Calculation Breakdown', 20, yPos)
+        doc.text('Credit Score Calculation Breakdown', 20, yPos)
         
         if (scoreBreakdown && scoreBreakdown.length > 0) {
           autoTable(doc, {
@@ -649,8 +649,8 @@ export default function ApplicationsPage() {
                   <DropdownMenuRadioItem value="highlight-desc">Highlighted First</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="time-desc">Most Recent</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="time-asc">Least Recent</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="score-desc">Risk Score (High to Low)</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="score-asc">Risk Score (Low to High)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="score-desc">Credit Score (High to Low)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="score-asc">Credit Score (Low to High)</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="amount-desc">Amount (High to Low)</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="amount-asc">Amount (Low to High)</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -685,7 +685,7 @@ export default function ApplicationsPage() {
               size="sm"
               onClick={handleExportSelected}
               disabled={selectedIds.size === 0 || isExporting}
-              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
             >
               <FileDown className="h-4 w-4 mr-2" />
               {isExporting ? 'Exporting...' : `Export (${selectedIds.size})`}
@@ -724,7 +724,7 @@ export default function ApplicationsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Loan Type</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Risk Score</TableHead>
+                <TableHead>Credit Score</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Review Status</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -778,12 +778,12 @@ export default function ApplicationsPage() {
                       {app.status === "Analyzing" || app.status === "Processing" ? (
                         <div className="flex items-center space-x-3">
                           <div className="flex flex-col gap-2">
-                            <div className="h-8 w-16 bg-gradient-to-r from-blue-100 via-blue-200 to-blue-100 rounded animate-pulse" style={{backgroundSize: '200% 100%', animation: 'shimmer 2s infinite'}} />
+                            <div className="h-8 w-16 bg-gradient-to-r from-indigo-100 via-indigo-200 to-indigo-100 rounded animate-pulse" style={{backgroundSize: '200% 100%', animation: 'shimmer 2s infinite'}} />
                             <div className="h-1.5 w-20 bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 rounded-full animate-pulse" style={{backgroundSize: '200% 100%', animation: 'shimmer 2s infinite'}} />
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
-                            <span className="text-xs text-blue-600 font-medium">Analyzing...</span>
+                            <div className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                            <span className="text-xs text-indigo-600 font-medium">Analyzing...</span>
                           </div>
                         </div>
                       ) : (
@@ -820,7 +820,7 @@ export default function ApplicationsPage() {
                         app.status === "Rejected" ? "bg-rose-100 text-rose-800 hover:bg-rose-100" :
                         app.status === "Review Required" ? "bg-amber-100 text-amber-800 hover:bg-amber-100" :
                         app.status === "Failed" ? "bg-red-100 text-red-800 hover:bg-red-100" :
-                        app.status === "Analyzing" || app.status === "Processing" ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
+                        app.status === "Analyzing" || app.status === "Processing" ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-100" :
                         "bg-slate-100 text-slate-800 hover:bg-slate-100"
                       }>
                         {app.status === "Analyzing" || app.status === "Processing" ? "Processing..." : app.status}
@@ -833,7 +833,7 @@ export default function ApplicationsPage() {
                           Manual Override
                         </Badge>
                       ) : app.review_status === "Human_Verified" ? (
-                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">
                           <User className="h-3 w-3 mr-1" />
                           Verified
                         </Badge>
