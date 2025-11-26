@@ -54,6 +54,9 @@ export interface ApplicationDetail {
   bank_statement_url?: string;
   essay_url?: string;
   payslip_url?: string;
+  supporting_doc_1_url?: string;
+  supporting_doc_2_url?: string;
+  supporting_doc_3_url?: string;
   file_metadata?: {
     application_form?: { filename: string; size_bytes: number; mime_type: string } | null;
     bank_statement?: { filename: string; size_bytes: number; mime_type: string } | null;

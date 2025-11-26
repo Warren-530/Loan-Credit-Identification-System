@@ -35,6 +35,9 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
   const [bankStatement, setBankStatement] = useState<File | null>(null)
   const [essay, setEssay] = useState<File | null>(null)
   const [payslip, setPayslip] = useState<File | null>(null)
+  const [supportingDoc1, setSupportingDoc1] = useState<File | null>(null)
+  const [supportingDoc2, setSupportingDoc2] = useState<File | null>(null)
+  const [supportingDoc3, setSupportingDoc3] = useState<File | null>(null)
   const [batchFile, setBatchFile] = useState<File | null>(null)
 
   const handleSubmit = async () => {
@@ -51,6 +54,11 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
       formData.append("bank_statement", bankStatement)
       formData.append("essay", essay)
       formData.append("payslip", payslip)
+      
+      // Append supporting documents individually
+      if (supportingDoc1) formData.append("supporting_doc_1", supportingDoc1)
+      if (supportingDoc2) formData.append("supporting_doc_2", supportingDoc2)
+      if (supportingDoc3) formData.append("supporting_doc_3", supportingDoc3)
 
       const result = await api.uploadApplication(formData)
       
@@ -60,6 +68,9 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
       setBankStatement(null)
       setEssay(null)
       setPayslip(null)
+      setSupportingDoc1(null)
+      setSupportingDoc2(null)
+      setSupportingDoc3(null)
       
       // Show success modal
       setApplicationId(result.application_id)
@@ -136,7 +147,7 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
             <TabsTrigger value="single">Single Entry</TabsTrigger>
             <TabsTrigger value="batch">Batch Upload</TabsTrigger>
           </TabsList>
-          <TabsContent value="single" className="space-y-4 py-4">
+          <TabsContent value="single" className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-2">
             <div className="space-y-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -225,6 +236,61 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                     </p>
                   )}
                   <p className="text-xs text-slate-500">Recent salary slip for income verification</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">5</span>
+                    Supporting Document 1 (Optional)
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setSupportingDoc1(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {supportingDoc1 && (
+                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {supportingDoc1.name}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">6</span>
+                    Supporting Document 2 (Optional)
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setSupportingDoc2(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {supportingDoc2 && (
+                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {supportingDoc2.name}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">7</span>
+                    Supporting Document 3 (Optional)
+                  </Label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setSupportingDoc3(e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {supportingDoc3 && (
+                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {supportingDoc3.name}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500">Additional proofs (e.g., Business Registration, Utility Bills)</p>
                 </div>
               </div>
 

@@ -67,6 +67,11 @@ class Application(SQLModel, table=True):
     essay_path: Optional[str] = None
     payslip_path: Optional[str] = None
     
+    # Supporting Documents (Max 3)
+    supporting_doc_1_path: Optional[str] = None
+    supporting_doc_2_path: Optional[str] = None
+    supporting_doc_3_path: Optional[str] = None
+    
     # AI Analysis Results (JSON)
     analysis_result: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     

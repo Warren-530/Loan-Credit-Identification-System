@@ -28,7 +28,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [currentPosition] = useState<number>(1) // position tracking placeholder
   const [totalApplications, setTotalApplications] = useState(0)
   const documentViewerRef = useRef<HTMLDivElement>(null)
-  const [docViewMode, setDocViewMode] = useState<'application_form'|'bank'|'essay'|'payslip'>('application_form')
+  const [docViewMode, setDocViewMode] = useState<'application_form'|'bank'|'essay'|'payslip'|'supporting_1'|'supporting_2'|'supporting_3'>('application_form')
   const [showPdf, setShowPdf] = useState(false)
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [isPolling, setIsPolling] = useState(false)
@@ -274,6 +274,13 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     document_texts?: { bank_statement?: string; essay?: string; payslip?: string };
     cross_verification?: { claim_topic?: string; evidence_found?: string; status?: string };
     compliance_audit?: { bias_check?: string; source_of_wealth?: string };
+    decision_justification?: {
+      recommendation: string;
+      overall_assessment: string;
+      strengths: string[];
+      concerns: string[];
+      key_reasons: string[];
+    };
   }
 
   const analysis = appData.analysis_result as AnalysisResult | null
@@ -1741,17 +1748,43 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
       {/* Right Panel: PDF Viewer Only */}
       <div className="bg-white rounded-lg border border-slate-300 flex flex-col" style={{ width: `${100 - leftPanelWidth}%` }}>
-        <div className="flex items-center gap-2 p-3 border-b bg-slate-50">
+        <div className="flex items-center gap-2 p-3 border-b bg-slate-50 overflow-x-auto">
           {(['application_form','bank','essay','payslip'] as const).map(mode => (
             <Button key={mode} size="sm" variant={docViewMode===mode? 'default':'outline'} onClick={()=>setDocViewMode(mode)}>
               {mode==='application_form'? 'Application Form': mode==='bank'? 'Bank Statement': mode==='essay'? 'Loan Essay':'Payslip'}
             </Button>
           ))}
-          <div className="ml-auto text-[11px] text-slate-500">PDF Viewer</div>
+          
+          {/* Supporting Docs Tabs */}
+          {appData.supporting_doc_1_url && (
+            <Button size="sm" variant={docViewMode==='supporting_1'? 'default':'outline'} onClick={()=>setDocViewMode('supporting_1')}>
+              Supp. Doc 1
+            </Button>
+          )}
+          {appData.supporting_doc_2_url && (
+            <Button size="sm" variant={docViewMode==='supporting_2'? 'default':'outline'} onClick={()=>setDocViewMode('supporting_2')}>
+              Supp. Doc 2
+            </Button>
+          )}
+          {appData.supporting_doc_3_url && (
+            <Button size="sm" variant={docViewMode==='supporting_3'? 'default':'outline'} onClick={()=>setDocViewMode('supporting_3')}>
+              Supp. Doc 3
+            </Button>
+          )}
+
+          <div className="ml-auto text-[11px] text-slate-500 whitespace-nowrap">PDF Viewer</div>
         </div>
         <div className="flex-1 overflow-hidden">
           {(() => {
-            const url = docViewMode==='application_form'? appData.application_form_url : docViewMode==='bank'? appData.bank_statement_url : docViewMode==='essay'? appData.essay_url : appData.payslip_url
+            let url = null;
+            if (docViewMode==='application_form') url = appData.application_form_url;
+            else if (docViewMode==='bank') url = appData.bank_statement_url;
+            else if (docViewMode==='essay') url = appData.essay_url;
+            else if (docViewMode==='payslip') url = appData.payslip_url;
+            else if (docViewMode==='supporting_1') url = appData.supporting_doc_1_url;
+            else if (docViewMode==='supporting_2') url = appData.supporting_doc_2_url;
+            else if (docViewMode==='supporting_3') url = appData.supporting_doc_3_url;
+
             if (!url) {
               return <div className="h-full flex items-center justify-center text-sm text-slate-400">No PDF available.</div>
             }

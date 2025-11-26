@@ -147,6 +147,9 @@ async def get_application(application_id: str):
         essay_url = build_file_url(app.essay_path)
         payslip_url = build_file_url(app.payslip_path)
         application_form_url = build_file_url(app.application_form_path)
+        supporting_doc_1_url = build_file_url(app.supporting_doc_1_path)
+        supporting_doc_2_url = build_file_url(app.supporting_doc_2_path)
+        supporting_doc_3_url = build_file_url(app.supporting_doc_3_path)
 
         # File metadata helper
         import mimetypes
@@ -160,7 +163,10 @@ async def get_application(application_id: str):
             "application_form": meta(app.application_form_path),
             "bank_statement": meta(app.bank_statement_path),
             "loan_essay": meta(app.essay_path),
-            "payslip": meta(app.payslip_path)
+            "payslip": meta(app.payslip_path),
+            "supporting_doc_1": meta(app.supporting_doc_1_path),
+            "supporting_doc_2": meta(app.supporting_doc_2_path),
+            "supporting_doc_3": meta(app.supporting_doc_3_path)
         }
         
         return {
@@ -187,6 +193,9 @@ async def get_application(application_id: str):
             "bank_statement_url": bank_url,
             "essay_url": essay_url,
             "payslip_url": payslip_url,
+            "supporting_doc_1_url": supporting_doc_1_url,
+            "supporting_doc_2_url": supporting_doc_2_url,
+            "supporting_doc_3_url": supporting_doc_3_url,
             "file_metadata": file_metadata,
         }
 
@@ -257,7 +266,8 @@ async def process_application_background(
     application_form_path: str,
     bank_statement_path: str,
     essay_path: str,
-    payslip_path: str
+    payslip_path: str,
+    supporting_doc_paths: List[str] = []
 ):
     """Background task to process application with AI - extracts applicant info from Application Form
     
@@ -267,6 +277,7 @@ async def process_application_background(
         bank_statement_path: Path to Bank Statement PDF
         essay_path: Path to Loan Essay PDF
         payslip_path: Path to Payslip PDF
+        supporting_doc_paths: List of paths to supporting documents
     """
     print(f"\n{'='*60}")
     print(f"Starting analysis for {application_id}")
@@ -274,6 +285,7 @@ async def process_application_background(
     print(f"Bank Statement: {bank_statement_path}")
     print(f"Essay: {essay_path}")
     print(f"Payslip: {payslip_path}")
+    print(f"Supporting Docs: {supporting_doc_paths}")
     print(f"{'='*60}\n")
 
     try:
@@ -358,6 +370,23 @@ async def process_application_background(
                 payslip_text = "Payslip extraction failed"
                 raw_text += f"\n\n=== PAYSLIP DOCUMENT ===\n{payslip_text}"
 
+        # Supporting Documents
+        supporting_docs_texts = []
+        for i, path in enumerate(supporting_doc_paths):
+            try:
+                print(f"Extracting supporting doc {i+1} from: {path}")
+                if path.endswith('.pdf'):
+                    doc_text = await run_in_threadpool(pdf_processor.extract_text, path)
+                else:
+                    doc_text = await run_in_threadpool(text_processor.extract_text, path)
+                supporting_docs_texts.append(doc_text)
+                print(f"✓ Supporting doc {i+1} extracted: {len(doc_text)} characters")
+            except Exception as e:
+                print(f"⚠ Error extracting supporting doc {i+1}: {e}")
+                supporting_docs_texts.append(f"Supporting doc {i+1} extraction failed")
+        
+        raw_text += "\n\n=== SUPPORTING DOCUMENTS ===\n" + "\n".join(supporting_docs_texts)
+
         print(f"\nTotal raw text length: {len(raw_text)} characters")
 
         result = None
@@ -387,7 +416,8 @@ async def process_application_background(
                     essay_text, 
                     payslip_text, 
                     application_id,
-                    application_form_path=application_form_path
+                    application_form_path=application_form_path,
+                    supporting_docs_texts=supporting_docs_texts
                 )
                 print("✓ AI analysis completed (Gemini)")
                 
@@ -550,16 +580,15 @@ async def process_application_background(
 @app.post("/api/upload")
 async def upload_application(
     background_tasks: BackgroundTasks,
-    application_form: UploadFile = File(...),  # NEW: Application Form (required)
+    application_form: UploadFile = File(...),
     bank_statement: UploadFile = File(...),
     essay: UploadFile = File(...),
     payslip: UploadFile = File(...),
+    supporting_doc_1: Optional[UploadFile] = File(None),
+    supporting_doc_2: Optional[UploadFile] = File(None),
+    supporting_doc_3: Optional[UploadFile] = File(None),
 ):
-    """Upload new loan application with 4 required documents
-    
-    All applicant information (name, IC, loan type, amount) will be extracted
-    from the Application Form PDF by AI.
-    """
+    """Upload new loan application with 4 required documents + up to 3 supporting docs"""
     try:
         # Generate application ID
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -589,6 +618,27 @@ async def upload_application(
         with open(payslip_path, "wb") as buffer:
             shutil.copyfileobj(payslip.file, buffer)
         
+        # Save supporting documents (up to 3)
+        supporting_doc_paths = []
+        
+        if supporting_doc_1:
+            doc_path = app_folder / f"supporting_doc_1_{supporting_doc_1.filename}"
+            with open(doc_path, "wb") as buffer:
+                shutil.copyfileobj(supporting_doc_1.file, buffer)
+            supporting_doc_paths.append(str(doc_path))
+            
+        if supporting_doc_2:
+            doc_path = app_folder / f"supporting_doc_2_{supporting_doc_2.filename}"
+            with open(doc_path, "wb") as buffer:
+                shutil.copyfileobj(supporting_doc_2.file, buffer)
+            supporting_doc_paths.append(str(doc_path))
+            
+        if supporting_doc_3:
+            doc_path = app_folder / f"supporting_doc_3_{supporting_doc_3.filename}"
+            with open(doc_path, "wb") as buffer:
+                shutil.copyfileobj(supporting_doc_3.file, buffer)
+            supporting_doc_paths.append(str(doc_path))
+        
         # Create application record (all fields will be filled by AI)
         with get_session() as session:
             app = Application(
@@ -598,6 +648,9 @@ async def upload_application(
                 bank_statement_path=str(bank_statement_path),
                 essay_path=str(essay_path),
                 payslip_path=str(payslip_path),
+                supporting_doc_1_path=supporting_doc_paths[0] if len(supporting_doc_paths) > 0 else None,
+                supporting_doc_2_path=supporting_doc_paths[1] if len(supporting_doc_paths) > 1 else None,
+                supporting_doc_3_path=supporting_doc_paths[2] if len(supporting_doc_paths) > 2 else None,
             )
             session.add(app)
             session.commit()
@@ -609,7 +662,8 @@ async def upload_application(
             str(application_form_path),
             str(bank_statement_path),
             str(essay_path),
-            str(payslip_path)
+            str(payslip_path),
+            supporting_doc_paths
         )
         
         return {
@@ -1686,10 +1740,16 @@ async def retry_application(application_id: str):
         if app_obj.status != ApplicationStatus.FAILED:
             raise HTTPException(status_code=400, detail="Application is not in FAILED state")
         # Cache required attributes before session closes
-        loan_type_val = app_obj.loan_type.value if hasattr(app_obj.loan_type, 'value') else str(app_obj.loan_type)
+        application_form_path = app_obj.application_form_path
         bank_path = app_obj.bank_statement_path or ''
         essay_path_local = app_obj.essay_path
         payslip_path_local = app_obj.payslip_path
+        
+        supporting_doc_paths = []
+        if app_obj.supporting_doc_1_path: supporting_doc_paths.append(app_obj.supporting_doc_1_path)
+        if app_obj.supporting_doc_2_path: supporting_doc_paths.append(app_obj.supporting_doc_2_path)
+        if app_obj.supporting_doc_3_path: supporting_doc_paths.append(app_obj.supporting_doc_3_path)
+        
         app_obj.status = ApplicationStatus.PROCESSING
         app_obj.updated_at = datetime.utcnow()
         session.add(app_obj)
@@ -1700,19 +1760,21 @@ async def retry_application(application_id: str):
         loop = asyncio.get_event_loop()
         loop.create_task(process_application_background(
             application_id,
-            loan_type_val,
+            application_form_path,
             bank_path,
             essay_path_local,
-            payslip_path_local
+            payslip_path_local,
+            supporting_doc_paths
         ))
     except RuntimeError:
         # If no running loop, fallback to asyncio.run (blocking) – rare in FastAPI
         asyncio.run(process_application_background(
             application_id,
-            loan_type_val,
+            application_form_path,
             bank_path,
             essay_path_local,
-            payslip_path_local
+            payslip_path_local,
+            supporting_doc_paths
         ))
 
     return {"success": True, "status": "Processing", "message": "Retry scheduled"}
@@ -1782,6 +1844,16 @@ async def copilot_ask(request: CopilotRequest):
         context_parts.append("=== PAYSLIP ===")
         context_parts.append(doc_texts.get("payslip", "No payslip available")[:2000])
         context_parts.append("")
+        
+        # Add Supporting Documents
+        supporting_docs = doc_texts.get("supporting_docs", [])
+        if supporting_docs:
+            context_parts.append("=== SUPPORTING DOCUMENTS ===")
+            for i, doc_text in enumerate(supporting_docs):
+                context_parts.append(f"--- Document {i+1} ---")
+                context_parts.append(doc_text[:2000])
+            context_parts.append("")
+
         context_parts.append("=== ANALYSIS SUMMARY ===")
         context_parts.append(f"Risk Score: {analysis.get('risk_score', 'N/A')}/100")
         context_parts.append(f"Final Decision: {analysis.get('final_decision', 'N/A')}")
@@ -1809,6 +1881,7 @@ You have access to the following documents for this specific applicant:
 2. Bank Statement  
 3. Loan Essay
 4. Payslip
+5. Supporting Documents (if any)
 
 {context}
 

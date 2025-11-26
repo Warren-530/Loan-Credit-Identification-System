@@ -23,7 +23,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: "assistant", 
-      content: "Hello! I'm TrustLens Copilot. I've analyzed this applicant's 4 documents (Application Form, Bank Statement, Loan Essay, Payslip). Ask me anything about their risk profile, transactions, or claims.",
+      content: "Hello! I'm TrustLens Copilot. I've analyzed this applicant's documents (Application Form, Bank Statement, Loan Essay, Payslip, and Supporting Docs). Ask me anything about their risk profile, transactions, or claims.",
       sources: []
     }
   ])

@@ -21,7 +21,7 @@ class AIEngine:
         self.model_name = "models/gemini-2.0-flash"
         self.max_retries = 3
     
-    def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "", application_form_path: str = None) -> Dict[str, Any]:
+    def analyze_application(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "", application_form_path: str = None, supporting_docs_texts: list[str] = []) -> Dict[str, Any]:
         """
         Analyze loan application using Gemini AI with XML-structured prompts for zero hallucination.
         
@@ -33,6 +33,7 @@ class AIEngine:
             payslip_text: Extracted payslip text (may be empty for Micro-Business)
             application_id: Unique application ID for context isolation
             application_form_path: Path to Application Form PDF (for Vision analysis)
+            supporting_docs_texts: List of extracted texts from supporting documents
             
         Returns:
             Analysis result as dictionary with applicant_profile and document_texts attached
@@ -52,7 +53,8 @@ class AIEngine:
                 payslip_text=payslip_text,
                 bank_statement_text=bank_text,
                 essay_text=essay_text,
-                application_id=application_id
+                application_id=application_id,
+                supporting_docs_texts=supporting_docs_texts
             )
             print(f"[AI ENGINE] XML prompt built, length: {len(prompt)} characters")
             
@@ -279,7 +281,9 @@ class AIEngine:
             result['document_texts'] = {
                 'bank_statement': bank_text,
                 'essay': essay_text,
-                'payslip': payslip_text
+                'payslip': payslip_text,
+                'application_form': application_form_text,
+                'supporting_docs': supporting_docs_texts
             }
             
             return result
