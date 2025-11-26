@@ -112,6 +112,7 @@ async def get_applications(limit: int = 50):
                 "review_status": app.review_status.value if app.review_status else "AI Pending",
                 "ai_decision": app.ai_decision,
                 "human_decision": app.human_decision,
+                "highlighted": app.highlighted or False,
             }
             for app in applications
         ]
@@ -448,6 +449,7 @@ async def get_application(application_id: str):
             "email_sent_at": app.email_sent_at.isoformat() if app.email_sent_at else None,
             "email_status": app.email_status,
             "email_error": app.email_error,
+            "highlighted": app.highlighted or False,
             "application_form_url": application_form_url,
             "bank_statement_url": bank_url,
             "essay_url": essay_url,
@@ -474,6 +476,26 @@ async def save_comment(application_id: str, request: CommentRequest):
         session.commit()
         
         return {"status": "success", "comment": app.comment}
+
+
+@app.post("/api/application/{application_id}/highlight")
+async def toggle_highlight(application_id: str, request: dict):
+    """Toggle highlight status for an application"""
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Update highlighted status
+        app.highlighted = request.get("highlighted", False)
+        session.add(app)
+        session.commit()
+        
+        return {
+            "status": "success",
+            "application_id": application_id,
+            "highlighted": app.highlighted
+        }
 
 
 @app.delete("/api/application/{application_id}")

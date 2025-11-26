@@ -19,6 +19,7 @@ export interface Application {
   applicant_ic?: string;
   application_id?: string;
   created_at?: string;
+  highlighted?: boolean;
 }
 
 export interface ApplicationDetail {
@@ -119,5 +120,15 @@ export const api = {
     } catch (e) {
       console.error("Delete failed", e);
     }
+  },
+
+  async toggleHighlight(applicationId: string, highlighted: boolean): Promise<{ status: string; application_id: string; highlighted: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/api/application/${applicationId}/highlight`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ highlighted }),
+    });
+    if (!response.ok) throw new Error('Failed to toggle highlight');
+    return response.json();
   },
 };

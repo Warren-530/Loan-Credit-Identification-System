@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowUpRight, Search, Filter, ArrowUpDown, CheckSquare, Trash2, Bot, User, AlertCircle as OverrideIcon, AlertTriangle, CheckCircle, Clock, FileDown } from "lucide-react"
+import { ArrowUpRight, Search, Filter, ArrowUpDown, CheckSquare, Trash2, Bot, User, AlertCircle as OverrideIcon, AlertTriangle, CheckCircle, Clock, FileDown, Star } from "lucide-react"
 import Link from "next/link"
 import { api, type Application } from "@/lib/api"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -50,6 +50,7 @@ export default function ApplicationsPage() {
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set())
   const [reviewStatusFilters, setReviewStatusFilters] = useState<Set<string>>(new Set())
   const [loanTypeFilters, setLoanTypeFilters] = useState<Set<string>>(new Set())
+  const [highlightedFilter, setHighlightedFilter] = useState(false)
 
   // Sort state
   const [sortBy, setSortBy] = useState<string>("time-desc")
@@ -98,8 +99,24 @@ export default function ApplicationsPage() {
       result = result.filter(app => app.type && loanTypeFilters.has(app.type))
     }
 
+    // Highlighted filter
+    if (highlightedFilter) {
+      result = result.filter(app => app.highlighted === true)
+    }
+
     // Sorting
     switch (sortBy) {
+      case "highlight-desc":
+        // Highlighted first, then by date within each group
+        result.sort((a, b) => {
+          if (a.highlighted !== b.highlighted) {
+            return (b.highlighted ? 1 : 0) - (a.highlighted ? 1 : 0)
+          }
+          const dateA = new Date(a.date || a.created_at || 0).getTime()
+          const dateB = new Date(b.date || b.created_at || 0).getTime()
+          return dateB - dateA
+        })
+        break
       case "score-asc":
         result.sort((a, b) => (a.score || 0) - (b.score || 0))
         break
@@ -139,7 +156,7 @@ export default function ApplicationsPage() {
     }
 
     setFilteredApplications(result)
-  }, [applications, searchTerm, statusFilters, reviewStatusFilters, loanTypeFilters, sortBy])
+  }, [applications, searchTerm, statusFilters, reviewStatusFilters, loanTypeFilters, sortBy, highlightedFilter])
 
   const handleSearch = () => {
     // Search is applied automatically through useEffect
@@ -182,6 +199,26 @@ export default function ApplicationsPage() {
     setSelectedIds(new Set());
     setShowDeleteDialog(false);
     window.location.reload(); // Force reload to ensure state is fresh
+  }
+
+  const handleToggleHighlight = async () => {
+    const ids = Array.from(selectedIds);
+    
+    // Check if any selected app is not highlighted
+    const hasUnhighlighted = applications
+      .filter(app => ids.includes(app.id))
+      .some(app => !app.highlighted);
+    
+    // If any are unhighlighted, highlight all. Otherwise, unhighlight all.
+    const shouldHighlight = hasUnhighlighted;
+    
+    for (const id of ids) {
+      await api.toggleHighlight(id, shouldHighlight);
+    }
+    
+    // Reload applications
+    await loadApplications();
+    setSelectedIds(new Set());
   }
 
   const toggleReviewStatusFilter = (status: string) => {
@@ -538,14 +575,14 @@ export default function ApplicationsPage() {
                 <Button variant="outline" size="sm">
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
-                  {(statusFilters.size + reviewStatusFilters.size + loanTypeFilters.size > 0) && (
+                  {(statusFilters.size + reviewStatusFilters.size + loanTypeFilters.size + (highlightedFilter ? 1 : 0) > 0) && (
                     <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-                      {statusFilters.size + reviewStatusFilters.size + loanTypeFilters.size}
+                      {statusFilters.size + reviewStatusFilters.size + loanTypeFilters.size + (highlightedFilter ? 1 : 0)}
                     </Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56">
+              <DropdownMenuContent className="w-56 max-h-[400px] overflow-y-auto">
                 <DropdownMenuLabel>Status</DropdownMenuLabel>
                 {['Approved', 'Rejected', 'Review Required', 'Processing', 'Analyzing', 'Failed'].map(status => (
                   <DropdownMenuCheckboxItem
@@ -556,6 +593,14 @@ export default function ApplicationsPage() {
                     {status}
                   </DropdownMenuCheckboxItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Highlight Status</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={highlightedFilter}
+                  onCheckedChange={() => setHighlightedFilter(!highlightedFilter)}
+                >
+                  Show Highlighted Only
+                </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Review Status</DropdownMenuLabel>
                 {['AI_Pending', 'Human_Verified', 'Manual_Override'].map(status => (
@@ -593,6 +638,7 @@ export default function ApplicationsPage() {
                 <DropdownMenuLabel>Sort By</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup value={sortBy} onValueChange={setSortBy}>
+                  <DropdownMenuRadioItem value="highlight-desc">Highlighted First</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="time-desc">Most Recent</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="time-asc">Least Recent</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="score-desc">Risk Score (High to Low)</DropdownMenuRadioItem>
@@ -611,6 +657,18 @@ export default function ApplicationsPage() {
             >
               <CheckSquare className="h-4 w-4 mr-2" />
               {selectedIds.size === filteredApplications.length && filteredApplications.length > 0 ? 'Deselect All' : 'Select All'}
+            </Button>
+
+            {/* Highlight Button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleToggleHighlight}
+              disabled={selectedIds.size === 0}
+              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            >
+              <Star className="h-4 w-4 mr-2" />
+              Highlight ({selectedIds.size})
             </Button>
 
             {/* Export */}
@@ -685,14 +743,22 @@ export default function ApplicationsPage() {
                 </TableRow>
               ) : (
                 filteredApplications.map((app) => (
-                  <TableRow key={app.id}>
+                  <TableRow 
+                    key={app.id}
+                    className={app.highlighted ? "bg-amber-50 hover:bg-amber-100 border-l-4 border-l-amber-400" : ""}
+                  >
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(app.id)}
                         onCheckedChange={() => toggleSelection(app.id)}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{app.id}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {app.highlighted && <Star className="h-4 w-4 text-amber-500 fill-amber-500" />}
+                        {app.id}
+                      </div>
+                    </TableCell>
                     <TableCell>{app.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-slate-50">

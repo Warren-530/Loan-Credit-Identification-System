@@ -89,6 +89,9 @@ class Application(SQLModel, table=True):
     email_sent_at: Optional[datetime] = None  # When email was sent
     email_status: Optional[str] = None  # 'pending', 'sent', 'failed'
     email_error: Optional[str] = None  # Error message if sending failed
+    
+    # Highlight/Label Field
+    highlighted: bool = Field(default=False)  # User-marked as important/highlighted
 
 
 class AnalysisCache(SQLModel, table=True):
