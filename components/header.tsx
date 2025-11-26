@@ -1,5 +1,4 @@
-import { Bell } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { NotificationCenter } from "./notification-center"
 
 export function Header() {
   return (
@@ -8,9 +7,7 @@ export function Header() {
         <h2 className="text-lg font-semibold text-slate-900">TrustLens AI</h2>
       </div>
       <div className="flex items-center space-x-4">
-        <Button variant="ghost" size="icon" className="text-slate-500">
-          <Bell className="h-5 w-5" />
-        </Button>
+        <NotificationCenter />
         <div className="flex items-center space-x-2 border-l pl-4 border-slate-200">
           <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold border border-emerald-200">
             JD

@@ -88,6 +88,34 @@ class AnalysisCache(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class RiskPolicy(SQLModel, table=True):
+    """Risk policy configuration settings"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dsr_threshold: float = Field(default=60.0)  # Debt Service Ratio threshold %
+    min_savings_rate: float = Field(default=10.0)  # Minimum savings rate %
+    confidence_threshold: float = Field(default=75.0)  # AI confidence threshold %
+    auto_reject_gambling: bool = Field(default=True)
+    auto_reject_high_dsr: bool = Field(default=True)
+    max_loan_micro_business: float = Field(default=50000.0)
+    max_loan_personal: float = Field(default=100000.0)
+    max_loan_housing: float = Field(default=500000.0)
+    max_loan_car: float = Field(default=150000.0)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_by: str = Field(default="System")
+
+
+class AuditLog(SQLModel, table=True):
+    """System audit trail for tracking all important actions"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    user: str = Field(default="System")  # Officer name/ID
+    action: str  # e.g., "Approved Application", "Changed DSR Threshold"
+    details: str  # Detailed description
+    application_id: Optional[str] = None  # Related application if applicable
+    old_value: Optional[str] = None  # For setting changes
+    new_value: Optional[str] = None  # For setting changes
+
+
 def init_db():
     """Initialize database tables"""
     from sqlmodel import create_engine

@@ -1150,6 +1150,8 @@ async def verify_application(
     request: VerifyRequest
 ):
     """Human verification/override of AI decision"""
+    from models import AuditLog
+    
     with get_session() as session:
         app = session.query(Application).filter(Application.application_id == application_id).first()
         
@@ -1195,6 +1197,19 @@ async def verify_application(
         
         # Mark the JSON column as modified so SQLAlchemy knows to update it
         flag_modified(app, "decision_history")
+        
+        # Add audit log
+        action_text = "Overrode AI Decision" if is_override else "Verified AI Decision"
+        log = AuditLog(
+            user=request.reviewer_name,
+            action=f"{action_text}: {request.decision}",
+            details=f"Application {application_id} - {app.applicant_name or 'Unknown'}" + 
+                   (f" | Reason: {request.override_reason}" if request.override_reason else ""),
+            application_id=application_id,
+            old_value=app.ai_decision if is_override else None,
+            new_value=request.decision
+        )
+        session.add(log)
         
         app.updated_at = datetime.utcnow()
         session.add(app)
@@ -2301,3 +2316,260 @@ Answer:"""
                 "sources": [],
                 "error": str(e)
             }
+
+
+# ============================================
+# SETTINGS & CONFIGURATION ENDPOINTS
+# ============================================
+
+@app.get("/api/settings")
+async def get_settings():
+    """Get current risk policy settings"""
+    from models import RiskPolicy, AuditLog
+    from sqlmodel import Session, create_engine, select
+    from database import get_session
+    
+    with get_session() as session:
+        # Get latest risk policy
+        policy = session.exec(select(RiskPolicy).order_by(RiskPolicy.id.desc())).first()
+        
+        if not policy:
+            # Create default if not exists
+            policy = RiskPolicy()
+            session.add(policy)
+            session.commit()
+            session.refresh(policy)
+        
+        # Get recent audit logs (last 50)
+        logs = session.exec(
+            select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(50)
+        ).all()
+        
+        return {
+            "policy": {
+                "dsr_threshold": policy.dsr_threshold,
+                "min_savings_rate": policy.min_savings_rate,
+                "confidence_threshold": policy.confidence_threshold,
+                "auto_reject_gambling": policy.auto_reject_gambling,
+                "auto_reject_high_dsr": policy.auto_reject_high_dsr,
+                "max_loan_micro_business": policy.max_loan_micro_business,
+                "max_loan_personal": policy.max_loan_personal,
+                "max_loan_housing": policy.max_loan_housing,
+                "max_loan_car": policy.max_loan_car,
+                "updated_at": policy.updated_at.isoformat(),
+                "updated_by": policy.updated_by
+            },
+            "audit_logs": [
+                {
+                    "id": log.id,
+                    "timestamp": log.timestamp.isoformat(),
+                    "user": log.user,
+                    "action": log.action,
+                    "details": log.details,
+                    "application_id": log.application_id,
+                    "old_value": log.old_value,
+                    "new_value": log.new_value
+                }
+                for log in logs
+            ]
+        }
+
+
+class UpdateSettingsRequest(BaseModel):
+    dsr_threshold: Optional[float] = None
+    min_savings_rate: Optional[float] = None
+    confidence_threshold: Optional[float] = None
+    auto_reject_gambling: Optional[bool] = None
+    auto_reject_high_dsr: Optional[bool] = None
+    max_loan_micro_business: Optional[float] = None
+    max_loan_personal: Optional[float] = None
+    max_loan_housing: Optional[float] = None
+    max_loan_car: Optional[float] = None
+    updated_by: str = "Admin"
+
+
+@app.post("/api/settings")
+async def update_settings(request: UpdateSettingsRequest):
+    """Update risk policy settings"""
+    from models import RiskPolicy, AuditLog
+    from sqlmodel import Session, create_engine, select
+    from database import get_session
+    
+    with get_session() as session:
+        # Get current policy
+        policy = session.exec(select(RiskPolicy).order_by(RiskPolicy.id.desc())).first()
+        
+        if not policy:
+            policy = RiskPolicy()
+            session.add(policy)
+        
+        # Track changes for audit log
+        changes = []
+        
+        for field, value in request.dict(exclude_unset=True).items():
+            if field == "updated_by":
+                policy.updated_by = value
+                continue
+                
+            old_value = getattr(policy, field, None)
+            if old_value != value:
+                changes.append({
+                    "field": field,
+                    "old": str(old_value),
+                    "new": str(value)
+                })
+                setattr(policy, field, value)
+        
+        policy.updated_at = datetime.utcnow()
+        
+        # Create audit log for changes
+        if changes:
+            for change in changes:
+                log = AuditLog(
+                    user=request.updated_by,
+                    action=f"Changed {change['field'].replace('_', ' ').title()}",
+                    details=f"Updated {change['field']} from {change['old']} to {change['new']}",
+                    old_value=change['old'],
+                    new_value=change['new']
+                )
+                session.add(log)
+        
+        session.commit()
+        session.refresh(policy)
+        
+        return {
+            "success": True,
+            "message": f"{len(changes)} settings updated successfully",
+            "policy": {
+                "dsr_threshold": policy.dsr_threshold,
+                "min_savings_rate": policy.min_savings_rate,
+                "confidence_threshold": policy.confidence_threshold,
+                "updated_at": policy.updated_at.isoformat(),
+                "updated_by": policy.updated_by
+            }
+        }
+
+
+@app.get("/api/database/stats")
+async def get_database_stats():
+    """Get database statistics"""
+    from models import Application, AuditLog
+    from database import get_session
+    import os
+    
+    with get_session() as session:
+        total_apps = session.query(Application).count()
+        approved = session.query(Application).filter(Application.status == ApplicationStatus.APPROVED).count()
+        rejected = session.query(Application).filter(Application.status == ApplicationStatus.REJECTED).count()
+        pending = session.query(Application).filter(Application.status == ApplicationStatus.REVIEW_REQUIRED).count()
+        processing = session.query(Application).filter(
+            Application.status.in_([ApplicationStatus.PROCESSING, ApplicationStatus.ANALYZING])
+        ).count()
+        
+        total_logs = session.query(AuditLog).count()
+        
+        # Get database file size
+        db_path = "trustlens.db"
+        db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        db_size_mb = db_size / (1024 * 1024)
+        
+        # Get last backup time (mock for now)
+        last_backup = datetime.utcnow()
+        
+        return {
+            "total_applications": total_apps,
+            "approved": approved,
+            "rejected": rejected,
+            "pending_review": pending,
+            "processing": processing,
+            "total_audit_logs": total_logs,
+            "database_size_mb": round(db_size_mb, 2),
+            "last_backup": last_backup.isoformat()
+        }
+
+
+@app.get("/api/export/applications")
+async def export_applications():
+    """Export all applications as CSV"""
+    from models import Application
+    from database import get_session
+    import csv
+    from io import StringIO
+    from fastapi.responses import StreamingResponse
+    
+    with get_session() as session:
+        applications = session.query(Application).order_by(Application.created_at.desc()).all()
+        
+        # Create CSV in memory
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Application ID', 'Name', 'IC', 'Loan Type', 'Requested Amount',
+            'Risk Score', 'Risk Level', 'Status', 'Final Decision',
+            'AI Decision', 'Human Decision', 'Reviewed By', 'Override Reason',
+            'Processing Time (s)', 'Created At', 'Updated At'
+        ])
+        
+        # Write data
+        for app in applications:
+            writer.writerow([
+                app.application_id,
+                app.applicant_name or '',
+                app.applicant_ic or '',
+                app.loan_type or '',
+                app.requested_amount or '',
+                app.risk_score or '',
+                app.risk_level or '',
+                app.status or '',
+                app.final_decision or '',
+                app.ai_decision or '',
+                app.human_decision or '',
+                app.reviewed_by or '',
+                app.override_reason or '',
+                app.processing_time or '',
+                app.created_at.isoformat() if app.created_at else '',
+                app.updated_at.isoformat() if app.updated_at else ''
+            ])
+        
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=applications_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            }
+        )
+
+
+@app.delete("/api/database/clear-test-data")
+async def clear_test_data():
+    """Clear all applications in Processing status"""
+    from models import Application, AuditLog
+    from database import get_session
+    
+    with get_session() as session:
+        count = session.query(Application).filter(
+            Application.status.in_([ApplicationStatus.PROCESSING, ApplicationStatus.ANALYZING])
+        ).count()
+        
+        session.query(Application).filter(
+            Application.status.in_([ApplicationStatus.PROCESSING, ApplicationStatus.ANALYZING])
+        ).delete()
+        
+        # Add audit log
+        log = AuditLog(
+            user="Admin",
+            action="Cleared Test Data",
+            details=f"Deleted {count} applications in Processing/Analyzing status"
+        )
+        session.add(log)
+        session.commit()
+        
+        return {
+            "success": True,
+            "deleted_count": count,
+            "message": f"Successfully deleted {count} test applications"
+        }
