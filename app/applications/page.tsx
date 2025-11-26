@@ -510,7 +510,7 @@ export default function ApplicationsPage() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Applications</h1>
       </div>
 
-      <Card>
+      <Card className="sticky top-0 z-10 shadow-md">
         <CardHeader>
           <CardTitle>Search & Filter Applications</CardTitle>
         </CardHeader>
