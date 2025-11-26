@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,8 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { 
   Settings, Sliders, Database, FileDown, Trash2, 
-  Bot, Activity, Clock, Shield, AlertCircle, CheckCircle2, Download
+  Bot, Activity, Clock, Shield, AlertCircle, CheckCircle2, Download, User, LogOut
 } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 interface PolicySettings {
   dsr_threshold: number
@@ -51,6 +53,8 @@ interface DatabaseStats {
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const { user, logout, changePassword } = useAuth()
   const [policy, setPolicy] = useState<PolicySettings | null>(null)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [dbStats, setDbStats] = useState<DatabaseStats | null>(null)
@@ -73,6 +77,54 @@ export default function SettingsPage() {
   // Simulation state
   const [showSimulation, setShowSimulation] = useState(false)
   const [simulationResult, setSimulationResult] = useState<string>('')
+  
+  // Change password state
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
+  
+  const getInitials = (name: string | null) => {
+    if (!name) return "U"
+    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+  }
+
+  const handleAccountLogout = async () => {
+    await logout()
+    router.push("/auth")
+  }
+  
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError(null)
+    setPasswordSuccess(null)
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match")
+      return
+    }
+    
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters")
+      return
+    }
+    
+    try {
+      await changePassword(currentPassword, newPassword)
+      setPasswordSuccess("Password changed successfully!")
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => {
+        setShowChangePassword(false)
+        setPasswordSuccess(null)
+      }, 2000)
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Failed to change password")
+    }
+  }
 
   useEffect(() => {
     fetchSettings()
@@ -787,7 +839,145 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* 6. Recent Activity */}
+          {/* 6. Account Settings */}
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-lg font-semibold text-slate-900">Account Settings</CardTitle>
+              </div>
+              <CardDescription className="text-xs text-slate-500">
+                Manage your account and authentication
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg">
+                    {getInitials(user?.displayName || null)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {user?.displayName || "User"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {user?.email || "user@example.com"}
+                    </p>
+                  </div>
+                </div>
+                <Separator className="my-3" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">Account Type</span>
+                    <Badge className="bg-blue-600 text-white">Premium</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">Member Since</span>
+                    <span className="text-slate-900 font-mono">
+                      {new Date().toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setShowChangePassword(!showChangePassword)}
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Change Password
+              </Button>
+
+              {showChangePassword && (
+                <form onSubmit={handleChangePassword} className="space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password" className="text-xs">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password" className="text-xs">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password" className="text-xs">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  {passwordError && (
+                    <div className="flex items-center gap-2 p-2 bg-rose-50 border border-rose-200 rounded">
+                      <AlertCircle className="h-3 w-3 text-rose-600" />
+                      <p className="text-xs text-rose-600">{passwordError}</p>
+                    </div>
+                  )}
+
+                  {passwordSuccess && (
+                    <div className="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 rounded">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      <p className="text-xs text-emerald-600">{passwordSuccess}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowChangePassword(false)
+                        setCurrentPassword('')
+                        setNewPassword('')
+                        setConfirmPassword('')
+                        setPasswordError(null)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" size="sm" className="flex-1">
+                      Update Password
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              <Separator />
+
+              <Button 
+                onClick={handleAccountLogout}
+                variant="outline"
+                className="w-full justify-start text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* 7. Recent Activity */}
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
