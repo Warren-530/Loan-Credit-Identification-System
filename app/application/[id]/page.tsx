@@ -530,53 +530,58 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       const doc = new jsPDF()
       
       // ==================== PAGE 1: EXECUTIVE SUMMARY ====================
-      // Header
-      doc.setFillColor(15, 23, 42) // slate-900
-      doc.rect(0, 0, 210, 40, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(24)
-      doc.setFont('helvetica', 'bold')
-      doc.text('INSIGHTLOAN', 20, 20)
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Credit Risk Assessment Report', 20, 30)
-      
-      // Application Info Box - Use AI-extracted data when available
+      // Header with Brand - Professional Black
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.5)
+      doc.line(20, 15, 190, 15)
       doc.setTextColor(0, 0, 0)
-      doc.setFillColor(241, 245, 249) // slate-100
-      doc.rect(20, 50, 170, 40, 'F')
-      doc.setFontSize(16)
+      doc.setFontSize(22)
       doc.setFont('helvetica', 'bold')
-      doc.text(analysis?.applicant_profile?.name || name, 25, 60)
-      doc.setFontSize(10)
+      doc.text('INSIGHTLOAN', 105, 23, { align: 'center' })
+      doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Application ID: ${resolvedParams.id}`, 25, 68)
-      doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || appData.loan_type || 'Personal Loan'}`, 25, 75)
-      doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : (appData.requested_amount ? `RM ${appData.requested_amount.toLocaleString()}` : 'Not Specified')}`, 25, 82)
-      doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 130, 68)
-      doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 75)
+      doc.text('Credit Risk Assessment Report', 105, 31, { align: 'center' })
+      doc.line(20, 35, 190, 35)
       
-      // Risk Score Section with color coding (0-100 scale)
-      const riskColor = riskScore >= 80 ? [16, 185, 129] : riskScore >= 60 ? [251, 191, 36] : [244, 63, 94]
-      doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
-      doc.rect(20, 100, 60, 25, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(28)
+      // Application Info Box - Black Border
+      doc.setTextColor(0, 0, 0)
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.3)
+      doc.rect(20, 45, 170, 40)
+      doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text(riskScore.toString(), 50, 115, { align: 'center' })
-      doc.setFontSize(10)
-      doc.text('RISK SCORE (/100)', 50, 122, { align: 'center' })
-      
-      // Decision Section with matching color
-      doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
-      doc.rect(90, 100, 100, 25, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(20)
-      doc.setFont('helvetica', 'bold')
-      doc.text(finalDecision.toUpperCase(), 140, 112, { align: 'center' })
+      doc.text(analysis?.applicant_profile?.name || name, 25, 54)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Risk Level: ${riskLevel}`, 140, 120, { align: 'center' })
+      doc.text(`Application ID: ${resolvedParams.id}`, 25, 61)
+      doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || appData.loan_type || 'Personal Loan'}`, 25, 67)
+      doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : (appData.requested_amount ? `RM ${appData.requested_amount.toLocaleString()}` : 'Not Specified')}`, 25, 73)
+      doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 25, 79)
+      doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 61)
+      
+      // Risk Score - Professional Box
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.8)
+      doc.rect(20, 95, 60, 25)
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(26)
+      doc.setFont('helvetica', 'bold')
+      doc.text(riskScore.toString(), 50, 110, { align: 'center' })
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('RISK SCORE (/100)', 50, 117, { align: 'center' })
+      
+      // Decision Box - Professional Format
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(0.8)
+      doc.rect(90, 95, 100, 25)
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text(finalDecision.toUpperCase(), 140, 106, { align: 'center' })
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Risk Level: ${riskLevel}`, 140, 114, { align: 'center' })
       
       // Score Calculation Breakdown Table
       let yPos = 140

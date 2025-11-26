@@ -151,7 +151,7 @@ class EmailService:
                         encoders.encode_base64(pdf_part)
                         pdf_part.add_header(
                             'Content-Disposition',
-                            f'attachment; filename="TrustLens_Report_{application_id}.pdf"'
+                            f'attachment; filename="InsightLoan_Report_{application_id}.pdf"'
                         )
                         msg.attach(pdf_part)
                 except Exception as e:
