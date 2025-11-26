@@ -745,48 +745,136 @@ async def upload_batch(
         # Handle ZIP files
         elif file.filename.endswith('.zip'):
             import zipfile
+            
+            # Extract ZIP to a temporary location
+            extract_root = UPLOAD_DIR / f"temp_zip_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            extract_root.mkdir(exist_ok=True)
+            
             with zipfile.ZipFile(batch_path, 'r') as zip_ref:
-                extract_path = UPLOAD_DIR / f"extracted_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                extract_path.mkdir(exist_ok=True)
-                zip_ref.extractall(extract_path)
+                zip_ref.extractall(extract_root)
+            
+            # Group files by folder (Applicant)
+            applicants_data = {}
+            
+            for root, dirs, files in os.walk(extract_root):
+                # Skip the root folder itself if it just contains other folders
+                if root == str(extract_root):
+                    continue
+                    
+                folder_name = os.path.basename(root)
+                if folder_name.startswith("__MACOSX"): continue
                 
-                # Look for CSV manifest or process individual PDFs
-                csv_files = list(extract_path.glob('*.csv'))
-                if csv_files:
-                    # Process CSV manifest
-                    import csv
-                    with open(csv_files[0], 'r', encoding='utf-8') as csvfile:
-                        reader = csv.DictReader(csvfile)
-                        for row in reader:
-                            timestamp = datetime.now().strftime("%Y%m%d%H%M%S") + str(processed_count)
-                            app_id = f"APP-{timestamp}"
-                            
-                            # Resolve file paths relative to extract_path
-                            bank_path = extract_path / row.get('bank_statement_path', '')
-                            essay_path = extract_path / row.get('essay_path', '') if row.get('essay_path') else None
-                            
-                            with get_session() as session:
-                                app = Application(
-                                    application_id=app_id,
-                                    applicant_name=row.get('applicant_name', 'Batch Upload'),
-                                    applicant_ic=row.get('ic_number', 'N/A'),
-                                    loan_type=LoanType(row.get('loan_type', 'Personal Loan')),
-                                    requested_amount=float(row.get('requested_amount', 50000)),
-                                    status=ApplicationStatus.PROCESSING,
-                                    bank_statement_path=str(bank_path) if bank_path.exists() else None,
-                                    essay_path=str(essay_path) if essay_path and essay_path.exists() else None,
-                                )
-                                session.add(app)
-                                session.commit()
-                            
-                            background_tasks.add_task(
-                                process_application_background,
-                                app_id,
-                                row.get('loan_type', 'Personal Loan'),
-                                str(bank_path) if bank_path.exists() else None,
-                                str(essay_path) if essay_path and essay_path.exists() else None
-                            )
-                            processed_count += 1
+                # Initialize applicant data
+                if folder_name not in applicants_data:
+                    applicants_data[folder_name] = {
+                        "files": [],
+                        "form": None,
+                        "bank": None,
+                        "essay": None,
+                        "payslip": None,
+                        "supporting": []
+                    }
+                
+                for filename in files:
+                    if filename.startswith("._"): continue # Skip Mac metadata
+                    
+                    file_path = os.path.join(root, filename)
+                    lower_name = filename.lower()
+                    
+                    # Smart Matching Logic - Enhanced for Tolerance
+                    # Check for Payslip (pay, slip, salary, gaji, income, wages)
+                    if any(k in lower_name for k in ["payslip", "pay slip", "salary", "gaji", "income", "wages", "slip", "pay"]):
+                        applicants_data[folder_name]["payslip"] = file_path
+                    
+                    # Check for Bank Statement (statement, bank, account, transaction, history, penyata)
+                    elif any(k in lower_name for k in ["bank", "statement", "account", "transaction", "history", "penyata", "txn"]):
+                        applicants_data[folder_name]["bank"] = file_path
+                        
+                    # Check for Application Form (form, application, borang, apply)
+                    elif any(k in lower_name for k in ["form", "application", "borang", "apply", "app"]):
+                        applicants_data[folder_name]["form"] = file_path
+                        
+                    # Check for Loan Essay (essay, purpose, reason, letter, proposal, explanation)
+                    elif any(k in lower_name for k in ["essay", "purpose", "reason", "letter", "proposal", "explanation", "tujuan"]):
+                        applicants_data[folder_name]["essay"] = file_path
+                        
+                    else:
+                        # Treat as supporting doc if we have space
+                        if len(applicants_data[folder_name]["supporting"]) < 3:
+                            applicants_data[folder_name]["supporting"].append(file_path)
+
+            # Process each identified applicant
+            for name, docs in applicants_data.items():
+                # Minimum requirement: Application Form + Bank Statement (or whatever logic you prefer)
+                # The user said "inside there will be 4+ documents", so we try to get all 4
+                
+                # Generate new Application ID
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                # Add a small random suffix to avoid collision in fast loops
+                import random
+                suffix = random.randint(1000, 9999)
+                app_id = f"APP-{timestamp}{suffix}"
+                
+                # Create specific upload folder for this app
+                app_upload_dir = UPLOAD_DIR / app_id
+                app_upload_dir.mkdir(exist_ok=True)
+                
+                # Helper to move file and return new path
+                def move_file(src_path):
+                    if not src_path: return None
+                    dst_name = os.path.basename(src_path)
+                    dst_path = app_upload_dir / dst_name
+                    shutil.move(src_path, dst_path)
+                    return str(dst_path)
+
+                # Move files
+                form_path = move_file(docs["form"])
+                bank_path = move_file(docs["bank"])
+                essay_path = move_file(docs["essay"])
+                payslip_path = move_file(docs["payslip"])
+                
+                supp_paths = []
+                for sp in docs["supporting"]:
+                    supp_paths.append(move_file(sp))
+                
+                # Pad supporting docs to 3
+                while len(supp_paths) < 3:
+                    supp_paths.append(None)
+
+                # Create DB Record
+                with get_session() as session:
+                    app = Application(
+                        application_id=app_id,
+                        applicant_name=name.replace("_", " "), # Use folder name as initial applicant name
+                        status=ApplicationStatus.PROCESSING,
+                        application_form_path=form_path,
+                        bank_statement_path=bank_path,
+                        essay_path=essay_path,
+                        payslip_path=payslip_path,
+                        supporting_doc_1_path=supp_paths[0],
+                        supporting_doc_2_path=supp_paths[1],
+                        supporting_doc_3_path=supp_paths[2]
+                    )
+                    session.add(app)
+                    session.commit()
+                
+                # Trigger AI Analysis
+                background_tasks.add_task(
+                    process_application_background,
+                    app_id,
+                    form_path,
+                    bank_path,
+                    essay_path,
+                    payslip_path,
+                    [p for p in supp_paths if p] # Pass only valid paths
+                )
+                processed_count += 1
+            
+            # Cleanup temp extraction folder
+            try:
+                shutil.rmtree(extract_root)
+            except:
+                pass
         
         return {
             "success": True,

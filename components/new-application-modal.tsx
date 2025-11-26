@@ -313,12 +313,23 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
           <TabsContent value="batch" className="space-y-4 py-4">
             <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium">Batch Upload Format</Label>
+                <Label className="text-sm font-medium">Batch Upload Format (ZIP)</Label>
                 <p className="text-xs text-slate-500 mt-1">
-                  Upload a ZIP file containing multiple application folders, each with 4 documents
+                  Upload a ZIP file containing multiple folders. Each folder represents one applicant.
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Folder structure: application_form.pdf, bank_statement.pdf, essay.pdf, payslip.pdf
+                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 font-mono">
+                  <p className="font-bold mb-1">Structure Example:</p>
+                  <p>batch_upload.zip</p>
+                  <p className="pl-4">├── Applicant_Ali/</p>
+                  <p className="pl-8">├── application_form.pdf</p>
+                  <p className="pl-8">├── bank_statement.pdf</p>
+                  <p className="pl-8">├── loan_essay.pdf</p>
+                  <p className="pl-8">└── payslip.pdf</p>
+                  <p className="pl-4">├── Applicant_Siti/</p>
+                  <p className="pl-8">└── ...</p>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  <span className="font-semibold">Auto-Detection:</span> The system automatically identifies files based on keywords in filenames (e.g., &quot;form&quot;, &quot;bank&quot;, &quot;essay&quot;, &quot;payslip&quot;).
                 </p>
               </div>
               
@@ -333,15 +344,6 @@ export function NewApplicationModal({ onUploadSuccess }: { onUploadSuccess?: () 
                 {batchFile && (
                   <p className="text-xs text-emerald-600">✓ {batchFile.name}</p>
                 )}
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-slate-900 mb-2">CSV Example Format:</p>
-                <pre className="text-xs text-slate-600 overflow-x-auto">
-{`loan_type,ic_number,applicant_name,requested_amount
-Micro-Business Loan,890101-14-5566,Ali bin Ahmad,50000
-Personal Loan,920202-15-7788,Sarah Tan,25000`}
-                </pre>
               </div>
 
               <div className="flex justify-end pt-4">
