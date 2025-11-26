@@ -7,6 +7,12 @@ BASE_SYSTEM_PROMPT = """
 ### ROLE & OBJECTIVE
 You are **TrustLens**, a strict Financial Forensic Auditor. Your goal is to analyze loan applications with mathematical precision.
 You DO NOT hallucinate. If a document is missing or data is unclear, output "Not Found" or "N/A".
+Current Date: {current_date}
+
+### TONE & STYLE
+- Use formal banking terminology (e.g., "Debt Service Ratio", "Credit Utilization", "Liquidity Buffer").
+- Avoid emotional or subjective language. Be objective and fact-based.
+- Maintain a professional, authoritative tone suitable for a credit committee review.
 
 ### INPUT STRUCTURE (XML tags)
 You will receive data wrapped in XML tags for clear document boundaries:
@@ -29,7 +35,8 @@ You will receive data wrapped in XML tags for clear document boundaries:
      - Does the name on the Utility Bill match the Applicant Name?
      - Does the Business Name on SSM match the Essay claims?
      - Is the document recent (within last 3 months)?
-   - **Flag Inconsistencies**: If Supporting Docs contradict the Application Form (e.g., different address), FLAG it.
+   - **Flag Inconsistencies**: If Supporting Docs contradict the Application Form (e.g., different address), FLAG it as a potential risk.
+   - **Verify Assets**: Check for proof of ownership (Grant, S&P Agreement) if assets are claimed in Essay.
 
 3. **Payroll Logic & Fraud Detection (Crucial)**:
    - **EPF Calculation Rule**: EPF is typically 11% of **GROSS Income** (Basic Salary + Fixed Allowances), NOT just Basic Salary. Do not flag "Calculation Error" if EPF is higher than 11% of Basic; check against Gross first.
@@ -802,7 +809,7 @@ def build_prompt(
     bank_statement_text: str,
     essay_text: str,
     application_id: str = "Unknown",
-    supporting_docs_texts: list[str] = []
+    supporting_docs_texts: list[str] = None
 ) -> str:
     """
     Build the complete prompt for Gemini with XML-structured inputs for zero hallucination.
@@ -818,6 +825,9 @@ def build_prompt(
     Returns:
         Complete prompt with XML tags wrapping each document
     """
+    if supporting_docs_texts is None:
+        supporting_docs_texts = []
+
     # Detect loan type from application form
     loan_type = "Personal Loan"  # Default
     
@@ -832,8 +842,12 @@ def build_prompt(
         elif "personal" in form_lower:
             loan_type = "Personal Loan"
     
+    # Get current date for context
+    from datetime import datetime
+    current_date = datetime.now().strftime("%Y-%m-%d")
+
     # Replace placeholders in base prompt
-    base_prompt_with_context = BASE_SYSTEM_PROMPT.replace("{id}", application_id).replace("{loan_type}", loan_type)
+    base_prompt_with_context = BASE_SYSTEM_PROMPT.replace("{id}", application_id).replace("{loan_type}", loan_type).replace("{current_date}", current_date)
     
     # Select scenario-specific guidance
     scenario_prompt = ""
@@ -846,8 +860,15 @@ def build_prompt(
     elif "Car" in loan_type:
         scenario_prompt = PROMPT_CAR
     
-    # Handle missing payslip (normal for Micro-Business Loan)
-    payslip_section = payslip_text if payslip_text.strip() else "N/A - No payslip provided (normal for Micro-Business Loan)"
+    # Handle missing payslip logic
+    payslip_section = payslip_text
+    if not payslip_text.strip():
+        if "Micro-Business" in loan_type:
+            payslip_section = "N/A - No payslip provided (normal for Micro-Business Loan)"
+        elif "Personal" in loan_type:
+            payslip_section = "MISSING - Applicant MUST provide payslip for Personal Loan. FLAG THIS AS CRITICAL DOCUMENT DEFICIENCY."
+        else:
+            payslip_section = "N/A - No payslip provided"
     
     # Build XML-structured prompt with clear document boundaries
     final_prompt = f"""
@@ -890,7 +911,9 @@ LOAN-SPECIFIC ANALYSIS GUIDANCE:
 6. Generate risk score with detailed breakdown (minimum 8 adjustments)
 7. Output 8+ key risk flags with exact evidence quotes
 8. Perform 5+ forensic claim-vs-reality comparisons
-9. Check <supporting_docs> for additional evidence or contradictions
+9. Check <supporting_docs> for additional evidence or contradictions:
+   - Check <supporting_docs> for proof of business registration (SSM), tenancy agreements, or other asset ownership mentioned in the Essay.
+   - If a document in <supporting_docs> contradicts the Application Form (e.g., different business address), FLAG it as a potential risk.
 
 CRITICAL: If <payslip> shows "N/A", set all payslip-related fields to "N/A" or null. Do NOT hallucinate payslip data.
 """
@@ -906,6 +929,10 @@ def build_prompt_legacy(application_form_text: str, raw_text: str, application_i
     
     THIS FUNCTION IS DEPRECATED - Use build_prompt() with separate document texts instead.
     """
+    import warnings
+    warnings.warn("build_prompt_legacy is deprecated. Use build_prompt with separate document texts.", DeprecationWarning)
+    print(f"[WARNING] Using deprecated build_prompt_legacy for {application_id}")
+
     # Try to split raw_text into sections (naive approach)
     payslip_text = ""
     bank_statement_text = ""

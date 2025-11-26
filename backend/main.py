@@ -1835,14 +1835,19 @@ async def copilot_ask(request: CopilotRequest):
         context_parts.append(f"Loan Type: {applicant_profile.get('loan_type', 'Unknown')}")
         context_parts.append(f"Requested Amount: RM {applicant_profile.get('requested_amount', 0):,.2f}")
         context_parts.append("")
-        context_parts.append("=== BANK STATEMENT ===")
-        context_parts.append(doc_texts.get("bank_statement", "No bank statement available")[:3000])
+        
+        # Include FULL document texts (Gemini 2.0 Flash has large context window)
+        context_parts.append("=== BANK STATEMENT (Full Text) ===")
+        context_parts.append(doc_texts.get("bank_statement", "No bank statement available")[:50000])
         context_parts.append("")
-        context_parts.append("=== LOAN ESSAY ===")
-        context_parts.append(doc_texts.get("essay", "No essay available")[:2000])
+        context_parts.append("=== LOAN ESSAY (Full Text) ===")
+        context_parts.append(doc_texts.get("essay", "No essay available")[:20000])
         context_parts.append("")
-        context_parts.append("=== PAYSLIP ===")
-        context_parts.append(doc_texts.get("payslip", "No payslip available")[:2000])
+        context_parts.append("=== PAYSLIP (Full Text) ===")
+        context_parts.append(doc_texts.get("payslip", "No payslip available")[:20000])
+        context_parts.append("")
+        context_parts.append("=== APPLICATION FORM (Full Text) ===")
+        context_parts.append(doc_texts.get("application_form", "No application form available")[:20000])
         context_parts.append("")
         
         # Add Supporting Documents
@@ -1850,18 +1855,35 @@ async def copilot_ask(request: CopilotRequest):
         if supporting_docs:
             context_parts.append("=== SUPPORTING DOCUMENTS ===")
             for i, doc_text in enumerate(supporting_docs):
-                context_parts.append(f"--- Document {i+1} ---")
-                context_parts.append(doc_text[:2000])
+                context_parts.append(f"--- Supporting Document {i+1} ---")
+                context_parts.append(doc_text[:30000])
             context_parts.append("")
 
-        context_parts.append("=== ANALYSIS SUMMARY ===")
+        # Add Analysis Results for "Intelligence"
+        context_parts.append("=== AI ANALYSIS RESULTS ===")
         context_parts.append(f"Risk Score: {analysis.get('risk_score', 'N/A')}/100")
         context_parts.append(f"Final Decision: {analysis.get('final_decision', 'N/A')}")
         
+        if analysis.get("financial_metrics"):
+            context_parts.append("\n--- Financial Metrics ---")
+            context_parts.append(str(analysis.get("financial_metrics")))
+            
+        if analysis.get("forensic_evidence"):
+            context_parts.append("\n--- Forensic Evidence (Claim vs Reality) ---")
+            context_parts.append(str(analysis.get("forensic_evidence")))
+            
+        if analysis.get("behavioral_insights"):
+            context_parts.append("\n--- Behavioral Insights ---")
+            context_parts.append(str(analysis.get("behavioral_insights")))
+
+        if analysis.get("decision_justification"):
+            context_parts.append("\n--- Decision Justification ---")
+            context_parts.append(str(analysis.get("decision_justification")))
+        
         # Add key findings
         if analysis.get("key_risk_flags"):
-            context_parts.append("\nKey Risk Flags:")
-            for flag in analysis.get("key_risk_flags", [])[:5]:
+            context_parts.append("\n--- Key Risk Flags ---")
+            for flag in analysis.get("key_risk_flags", [])[:10]:
                 context_parts.append(f"- {flag.get('flag', '')}: {flag.get('description', '')}")
         
         context = "\n".join(context_parts)
@@ -1872,27 +1894,26 @@ async def copilot_ask(request: CopilotRequest):
             genai.configure(api_key=GEMINI_API_KEY)
             model = genai.GenerativeModel("models/gemini-2.0-flash")
             
-            copilot_prompt = f"""You are TrustLens Copilot, an AI assistant helping a Credit Officer review loan applications.
+            copilot_prompt = f"""You are TrustLens Copilot, an expert Senior Credit Analyst and Forensic Auditor.
+Your goal is to assist a Credit Officer by answering questions about a specific loan application with high precision and depth.
 
 CRITICAL: You are ONLY analyzing Application ID: {request.application_id}. Do NOT mix information from other applications.
 
-You have access to the following documents for this specific applicant:
-1. Application Form
-2. Bank Statement  
-3. Loan Essay
-4. Payslip
-5. Supporting Documents (if any)
+You have access to the following:
+1. FULL TEXT of all uploaded documents (Application Form, Bank Statement, Essay, Payslip, Supporting Docs).
+2. PRE-COMPUTED AI ANALYSIS (Risk Score, Financial Metrics, Forensic Evidence, etc.).
 
 {context}
 
 User Question: {request.question}
 
-Instructions:
-1. Answer ONLY based on the documents provided above for Application ID: {request.application_id}
-2. Quote specific evidence from the documents when possible
-3. If the answer isn't in the documents, say "I don't have that information in the available documents"
-4. Be concise and helpful
-5. Reference which document you're citing (e.g., "According to the Bank Statement...")
+INSTRUCTIONS:
+1. **Answer ONLY based on the provided documents and analysis.** Do not hallucinate.
+2. **Be "Intelligent":** Synthesize information from multiple documents. For example, if asked about income, check the Payslip AND the Bank Statement deposits.
+3. **Cite Evidence:** Quote specific amounts, dates, or text from the documents to back up your answer.
+4. **Use the Analysis:** Refer to the calculated Financial Metrics (DSR, NDI) or Risk Flags if relevant to the question.
+5. **Reference Sources:** Explicitly state which document you are citing (e.g., "According to the Bank Statement...", "The Supporting Document 1 shows...").
+6. **Tone:** Professional, objective, and analytical.
 
 Answer:"""
             
@@ -1909,6 +1930,8 @@ Answer:"""
                 sources.append("Payslip")
             if "Application" in answer or "application form" in answer:
                 sources.append("Application Form")
+            if "Supporting Document" in answer or "supporting document" in answer:
+                sources.append("Supporting Docs")
             
             return {
                 "answer": answer,

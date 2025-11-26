@@ -40,7 +40,7 @@ class AIEngine:
         """
         if application_form_path:
             print(f"[AI ENGINE] Switching to Vision Analysis for {application_id}")
-            return self.analyze_application_with_vision(application_form_path, bank_text, essay_text, payslip_text, application_id)
+            return self.analyze_application_with_vision(application_form_path, bank_text, essay_text, payslip_text, application_id, supporting_docs_texts)
 
         try:
             # Build the prompt with XML structure for clear document boundaries
@@ -335,7 +335,7 @@ class AIEngine:
                 print(f"Raw AI response (first 500 chars): {result_text[:500]}")
             raise
         
-    def analyze_application_with_vision(self, application_form_path: str, bank_text: str, essay_text: str, payslip_text: str, application_id: str) -> Dict[str, Any]:
+    def analyze_application_with_vision(self, application_form_path: str, bank_text: str, essay_text: str, payslip_text: str, application_id: str, supporting_docs_texts: list[str] = []) -> Dict[str, Any]:
         """
         Multimodal analysis:
         1. Convert Application Form PDF (Page 1) -> Image
@@ -353,7 +353,7 @@ class AIEngine:
         except Exception as e:
             print(f"[ERROR] Failed to convert PDF to Image: {e}")
             # Fallback to text-only if image conversion fails
-            return self.analyze_application("", "", bank_text, essay_text, payslip_text, application_id)
+            return self.analyze_application("", "", bank_text, essay_text, payslip_text, application_id, supporting_docs_texts=supporting_docs_texts)
 
         # 2. Build Prompt (Text Part)
         # We pass empty application_form_text because the image replaces it
@@ -362,7 +362,8 @@ class AIEngine:
             payslip_text=payslip_text,
             bank_statement_text=bank_text,
             essay_text=essay_text,
-            application_id=application_id
+            application_id=application_id,
+            supporting_docs_texts=supporting_docs_texts
         )
 
         # 3. Call Gemini with Image + Text
@@ -395,6 +396,16 @@ class AIEngine:
         try:
             result = json.loads(result_text)
             print(f"[DEBUG] JSON parsed successfully")
+            
+            # Attach original document texts for frontend display
+            result['document_texts'] = {
+                'bank_statement': bank_text,
+                'essay': essay_text,
+                'payslip': payslip_text,
+                'application_form': "(Extracted from Image)",
+                'supporting_docs': supporting_docs_texts
+            }
+            
             return result
         except json.JSONDecodeError as json_err:
             print(f"[ERROR] JSON Parse Failed: {json_err}")
