@@ -841,9 +841,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div ref={containerRef} className="flex h-[calc(100vh-8rem)] gap-0 relative select-none">
+    <div ref={containerRef} className="flex h-[calc(100vh-8rem)] gap-0 relative">
       {/* Left Panel: AI Analysis */}
-      <div className="flex flex-col space-y-6 overflow-y-auto pr-4" style={{ width: `${leftPanelWidth}%` }}>
+      <div className="flex flex-col space-y-6 overflow-y-auto pr-4 select-text" style={{ width: `${leftPanelWidth}%` }}>
         {/* Enhanced Header with Context Layer */}
         <div className="space-y-3">
           <div className="flex items-start justify-between">

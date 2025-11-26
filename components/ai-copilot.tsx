@@ -232,11 +232,12 @@ export function AICopilot({ applicationId }: AICopilotProps) {
                     className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap select-text ${
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap !select-text cursor-text ${
                         msg.role === "user"
                           ? "bg-blue-600 text-white"
                           : "bg-slate-100 text-slate-900"
                       }`}
+                      onMouseDown={(e) => e.stopPropagation()}
                       style={{ 
                         wordBreak: 'break-word',
                         overflowWrap: 'break-word'
