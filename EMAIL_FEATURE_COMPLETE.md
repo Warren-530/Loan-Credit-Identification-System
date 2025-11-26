@@ -165,7 +165,7 @@
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=insightloan.official@gmail.com
-SMTP_PASSWORD=rmmfvpapwwgafawp
+SMTP_PASSWORD=YOUR-APP-PASSWORD-HERE
 SMTP_FROM_EMAIL=insightloan.official@gmail.com
 SMTP_FROM_NAME=InsightLoan AI Credit Department
 ```

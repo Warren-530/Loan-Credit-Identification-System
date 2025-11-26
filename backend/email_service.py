@@ -97,17 +97,8 @@ class EmailService:
             # Load SMTP configuration (from database or environment)
             smtp_host, smtp_port, smtp_username, smtp_password, from_email, from_name = self._load_smtp_config(db_session)
             
-            # Debug logging
-            print(f"[EMAIL DEBUG] Loaded SMTP config:")
-            print(f"  smtp_host: {smtp_host}")
-            print(f"  smtp_port: {smtp_port}")
-            print(f"  smtp_username: {smtp_username}")
-            print(f"  smtp_password: {'***' if smtp_password else 'NOT SET'}")
-            print(f"  from_email: {from_email}")
-            
             # Validate SMTP configuration
             if not smtp_username or not smtp_password:
-                print(f"[EMAIL DEBUG] Validation failed - username: {bool(smtp_username)}, password: {bool(smtp_password)}")
                 return {
                     "status": "failed",
                     "error": "SMTP credentials not configured. Please update settings."
