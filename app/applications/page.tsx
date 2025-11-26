@@ -269,53 +269,58 @@ export default function ApplicationsPage() {
         const forensicEvidence = analysis?.forensic_evidence?.claim_vs_reality || []
         
         // ==================== PAGE 1: EXECUTIVE SUMMARY ====================
-        // Header
-        doc.setFillColor(15, 23, 42)
-        doc.rect(0, 0, 210, 40, 'F')
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(24)
-        doc.setFont('helvetica', 'bold')
-        doc.text('INSIGHTLOAN', 20, 20)
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'normal')
-        doc.text('Credit Risk Assessment Report', 20, 30)
-        
-        // Application Info Box
+        // Header - Professional Black
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.5)
+        doc.line(20, 15, 190, 15)
         doc.setTextColor(0, 0, 0)
-        doc.setFillColor(241, 245, 249)
-        doc.rect(20, 50, 170, 40, 'F')
-        doc.setFontSize(16)
+        doc.setFontSize(22)
         doc.setFont('helvetica', 'bold')
-        doc.text(name, 25, 60)
-        doc.setFontSize(10)
+        doc.text('INSIGHTLOAN', 105, 23, { align: 'center' })
+        doc.setFontSize(11)
         doc.setFont('helvetica', 'normal')
-        doc.text(`Application ID: ${app.id}`, 25, 68)
-        doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || app.type || 'Personal Loan'}`, 25, 75)
-        doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : app.amount}`, 25, 82)
-        doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 130, 68)
-        doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 75)
+        doc.text('Credit Risk Assessment Report', 105, 31, { align: 'center' })
+        doc.line(20, 35, 190, 35)
         
-        // Risk Score Section
-        const riskColor = riskScore >= 80 ? [16, 185, 129] : riskScore >= 60 ? [251, 191, 36] : [244, 63, 94]
-        doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
-        doc.rect(20, 100, 60, 25, 'F')
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(28)
+        // Application Info Box - Black Border
+        doc.setTextColor(0, 0, 0)
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.3)
+        doc.rect(20, 45, 170, 40)
+        doc.setFontSize(14)
         doc.setFont('helvetica', 'bold')
-        doc.text(riskScore.toString(), 50, 115, { align: 'center' })
-        doc.setFontSize(10)
-        doc.text('RISK SCORE (/100)', 50, 122, { align: 'center' })
-        
-        // Decision Section
-        doc.setFillColor(riskColor[0], riskColor[1], riskColor[2])
-        doc.rect(90, 100, 100, 25, 'F')
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(20)
-        doc.setFont('helvetica', 'bold')
-        doc.text(finalDecision.toUpperCase(), 140, 112, { align: 'center' })
+        doc.text(name, 25, 54)
         doc.setFontSize(9)
         doc.setFont('helvetica', 'normal')
-        doc.text(`Risk Level: ${riskLevel}`, 140, 120, { align: 'center' })
+        doc.text(`Application ID: ${app.id}`, 25, 61)
+        doc.text(`Loan Type: ${analysis?.applicant_profile?.loan_type || app.type || 'Personal Loan'}`, 25, 67)
+        doc.text(`Requested Amount: ${analysis?.applicant_profile?.requested_amount ? `RM ${analysis.applicant_profile.requested_amount.toLocaleString()}` : app.amount}`, 25, 73)
+        doc.text(`Assessment Date: ${new Date().toLocaleDateString()}`, 25, 79)
+        doc.text(`Status: ${finalDecision} (${riskLevel} Risk)`, 130, 61)
+        
+        // Risk Score Section - Professional Box
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.8)
+        doc.rect(20, 95, 60, 25)
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(26)
+        doc.setFont('helvetica', 'bold')
+        doc.text(riskScore.toString(), 50, 110, { align: 'center' })
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text('RISK SCORE (/100)', 50, 117, { align: 'center' })
+        
+        // Decision Section - Professional Box
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.8)
+        doc.rect(90, 95, 100, 25)
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(18)
+        doc.setFont('helvetica', 'bold')
+        doc.text(finalDecision.toUpperCase(), 140, 106, { align: 'center' })
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Risk Level: ${riskLevel}`, 140, 114, { align: 'center' })
         
         // Score Breakdown Table
         let yPos = 140
@@ -333,8 +338,9 @@ export default function ApplicationsPage() {
               sb.reason
             ]),
             theme: 'grid',
-            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
+            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.3, lineColor: [0, 0, 0], fontStyle: 'bold' },
+            bodyStyles: { lineWidth: 0.1, lineColor: [100, 100, 100] },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
             margin: { left: 20, right: 20 },
             columnStyles: { 2: { cellWidth: 90 } }
           })
@@ -357,8 +363,9 @@ export default function ApplicationsPage() {
               f.description || 'See detailed analysis'
             ]),
             theme: 'grid',
-            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
+            headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.3, lineColor: [0, 0, 0], fontStyle: 'bold' },
+            bodyStyles: { lineWidth: 0.1, lineColor: [100, 100, 100] },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
             margin: { left: 20, right: 20 },
             columnStyles: {
               0: { cellWidth: 50 },
@@ -375,25 +382,26 @@ export default function ApplicationsPage() {
           doc.addPage()
           yPos = 20
           
-          doc.setFillColor(15, 23, 42)
-          doc.rect(0, yPos - 5, 210, 12, 'F')
-          doc.setTextColor(255, 255, 255)
+          // Section Header - Professional
+          doc.setDrawColor(0, 0, 0)
+          doc.setLineWidth(0.5)
+          doc.line(20, yPos, 190, yPos)
+          doc.setTextColor(0, 0, 0)
           doc.setFontSize(16)
           doc.setFont('helvetica', 'bold')
-          doc.text('DECISION JUSTIFICATION', 105, yPos + 3, { align: 'center' })
-          yPos += 15
+          doc.text('DECISION JUSTIFICATION', 105, yPos + 8, { align: 'center' })
+          doc.line(20, yPos + 12, 190, yPos + 12)
+          yPos += 20
           
           const justification = analysis.decision_justification
           const recommendation = justification.recommendation || finalDecision
           
-          // Recommendation Badge
+          // Recommendation Badge - Professional Format
+          doc.setDrawColor(0, 0, 0)
+          doc.setLineWidth(0.8)
+          doc.rect(20, yPos, 170, 15)
           doc.setTextColor(0, 0, 0)
-          const recColor = recommendation === 'APPROVE' ? [16, 185, 129] : 
-                          recommendation === 'REVIEW' ? [251, 191, 36] : [244, 63, 94]
-          doc.setFillColor(recColor[0], recColor[1], recColor[2])
-          doc.roundedRect(20, yPos, 170, 15, 3, 3, 'F')
-          doc.setTextColor(255, 255, 255)
-          doc.setFontSize(18)
+          doc.setFontSize(16)
           doc.setFont('helvetica', 'bold')
           doc.text(`RECOMMENDATION: ${recommendation}`, 105, yPos + 10, { align: 'center' })
           yPos += 25
@@ -419,8 +427,8 @@ export default function ApplicationsPage() {
             if (justification.strengths && justification.strengths.length > 0) {
               doc.setFontSize(11)
               doc.setFont('helvetica', 'bold')
-              doc.setTextColor(16, 185, 129)
-              doc.text('✓ STRENGTHS', 20, leftY)
+              doc.setTextColor(0, 0, 0)
+              doc.text('STRENGTHS', 20, leftY)
               leftY += 7
               
               doc.setFontSize(9)
@@ -437,8 +445,8 @@ export default function ApplicationsPage() {
             if (justification.concerns && justification.concerns.length > 0) {
               doc.setFontSize(11)
               doc.setFont('helvetica', 'bold')
-              doc.setTextColor(244, 63, 94)
-              doc.text('⚠ CONCERNS', 110, rightY)
+              doc.setTextColor(0, 0, 0)
+              doc.text('CONCERNS', 110, rightY)
               rightY += 7
               
               doc.setFontSize(9)

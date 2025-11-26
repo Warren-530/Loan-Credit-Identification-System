@@ -594,8 +594,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             sb.reason
           ]),
           theme: 'grid',
-          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.3, lineColor: [0, 0, 0], fontStyle: 'bold' },
+          bodyStyles: { lineWidth: 0.1, lineColor: [100, 100, 100] },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
           margin: { left: 20, right: 20 },
           columnStyles: { 2: { cellWidth: 90 } }
         })
@@ -624,8 +625,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             f.description || 'See detailed analysis'
           ]),
           theme: 'grid',
-          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.3, lineColor: [0, 0, 0], fontStyle: 'bold' },
+          bodyStyles: { lineWidth: 0.1, lineColor: [100, 100, 100] },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
           margin: { left: 20, right: 20 },
           columnStyles: {
             0: { cellWidth: 50 },
@@ -659,8 +661,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             (fe.statement_evidence || 'N/A').substring(0, 60) + '...'
           ]),
           theme: 'grid',
-          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.3, lineColor: [0, 0, 0], fontStyle: 'bold' },
+          bodyStyles: { lineWidth: 0.1, lineColor: [100, 100, 100] },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
           margin: { left: 20, right: 20 },
           columnStyles: {
             0: { cellWidth: 40 },
@@ -672,78 +675,31 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         yPos = doc.lastAutoTable.finalY + 10
       }
       
-      // Financial Metrics Summary (if space allows and data exists)
-      if (yPos < 220 && analysis?.financial_metrics) {
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.text('Financial Metrics Summary', 20, yPos)
-        
-        const metrics = analysis.financial_metrics
-        const metricsData = []
-        
-        if (metrics.debt_service_ratio) {
-          metricsData.push([
-            'Debt Service Ratio (DSR)',
-            `${metrics.debt_service_ratio.value.toFixed(1)}%`,
-            metrics.debt_service_ratio.assessment || 'N/A'
-          ])
-        }
-        if (metrics.net_disposable_income) {
-          metricsData.push([
-            'Net Disposable Income',
-            `RM ${metrics.net_disposable_income.value.toLocaleString()}`,
-            metrics.net_disposable_income.assessment || 'N/A'
-          ])
-        }
-        if (metrics.savings_rate) {
-          metricsData.push([
-            'Savings Rate',
-            `${metrics.savings_rate.value.toFixed(1)}%`,
-            metrics.savings_rate.assessment || 'N/A'
-          ])
-        }
-        
-        if (metricsData.length > 0) {
-          autoTable(doc, {
-            startY: yPos + 5,
-            head: [['Metric', 'Value', 'Assessment']],
-            body: metricsData,
-            theme: 'grid',
-            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            margin: { left: 20, right: 20 }
-          })
-          
-          // @ts-expect-error - autoTable adds finalY to doc
-          yPos = doc.lastAutoTable.finalY + 10
-        }
-      }
-      
       // ==================== PAGE 2: DECISION JUSTIFICATION ====================
       if (analysis?.decision_justification) {
         doc.addPage()
         yPos = 20
         
-        // Section Header
-        doc.setFillColor(15, 23, 42)
-        doc.rect(0, yPos - 5, 210, 12, 'F')
-        doc.setTextColor(255, 255, 255)
+        // Section Header - Professional
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.5)
+        doc.line(20, yPos, 190, yPos)
+        doc.setTextColor(0, 0, 0)
         doc.setFontSize(16)
         doc.setFont('helvetica', 'bold')
-        doc.text('DECISION JUSTIFICATION', 105, yPos + 3, { align: 'center' })
-        yPos += 15
+        doc.text('DECISION JUSTIFICATION', 105, yPos + 8, { align: 'center' })
+        doc.line(20, yPos + 12, 190, yPos + 12)
+        yPos += 20
         
         const justification = analysis.decision_justification
         const recommendation = justification.recommendation || finalDecision
         
-        // Recommendation Badge
+        // Recommendation Box - Professional Black Border
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.8)
+        doc.rect(20, yPos, 170, 15)
         doc.setTextColor(0, 0, 0)
-        const recColor = recommendation === 'APPROVE' ? [16, 185, 129] : 
-                        recommendation === 'REVIEW' ? [251, 191, 36] : [244, 63, 94]
-        doc.setFillColor(recColor[0], recColor[1], recColor[2])
-        doc.roundedRect(20, yPos, 170, 15, 3, 3, 'F')
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(18)
+        doc.setFontSize(16)
         doc.setFont('helvetica', 'bold')
         doc.text(`RECOMMENDATION: ${recommendation}`, 105, yPos + 10, { align: 'center' })
         yPos += 25
@@ -765,13 +721,13 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         
         // Strengths and Concerns in Two Columns
         if (justification.strengths || justification.concerns) {
-          // Strengths Column
+          // Strengths Column - Professional Format
           let leftY = yPos
           if (justification.strengths && justification.strengths.length > 0) {
             doc.setFontSize(11)
             doc.setFont('helvetica', 'bold')
-            doc.setTextColor(16, 185, 129)
-            doc.text('✓ STRENGTHS', 20, leftY)
+            doc.setTextColor(0, 0, 0)
+            doc.text('STRENGTHS', 20, leftY)
             leftY += 7
             
             doc.setFontSize(9)
@@ -784,13 +740,13 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             })
           }
           
-          // Concerns Column
+          // Concerns Column - Professional Format
           let rightY = yPos
           if (justification.concerns && justification.concerns.length > 0) {
             doc.setFontSize(11)
             doc.setFont('helvetica', 'bold')
-            doc.setTextColor(244, 63, 94)
-            doc.text('⚠ CONCERNS', 110, rightY)
+            doc.setTextColor(0, 0, 0)
+            doc.text('CONCERNS', 110, rightY)
             rightY += 7
             
             doc.setFontSize(9)
@@ -823,77 +779,8 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
           })
         }
       }
-      
-      // ==================== PAGE 3: FINANCIAL METRICS ====================
-      if (analysis?.financial_metrics) {
-        doc.addPage()
-        yPos = 20
-        
-        // Section Header
-        doc.setFillColor(15, 23, 42)
-        doc.rect(0, yPos - 5, 210, 12, 'F')
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(16)
-        doc.setFont('helvetica', 'bold')
-        doc.text('FINANCIAL METRICS ANALYSIS', 105, yPos + 3, { align: 'center' })
-        yPos += 18
-        
-        const metrics = analysis.financial_metrics
-        const metricsList = [
-          { key: 'debt_service_ratio', label: 'Debt Service Ratio (DSR)', unit: '%' },
-          { key: 'net_disposable_income', label: 'Net Disposable Income', unit: 'RM' },
-          { key: 'savings_rate', label: 'Savings Rate', unit: '%' },
-          { key: 'per_capita_income', label: 'Per Capita Income', unit: 'RM' }
-        ]
-        
-        metricsList.forEach(({ key, label, unit }) => {
-          const metric = metrics[key as keyof FinancialMetrics]
-          if (metric && metric.value !== undefined) {
-            if (yPos > 250) {
-              doc.addPage()
-              yPos = 20
-            }
-            
-            // Metric Box
-            doc.setDrawColor(203, 213, 225)
-            doc.setFillColor(248, 250, 252)
-            doc.rect(20, yPos, 170, 22, 'FD')
-            
-            // Label
-            doc.setFontSize(10)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(0, 0, 0)
-            doc.text(label, 22, yPos + 6)
-            
-            // Value
-            doc.setFontSize(14)
-            doc.setTextColor(37, 99, 235)
-            const displayValue = unit === 'RM' ? 
-              `${unit} ${metric.value.toLocaleString()}` : 
-              `${metric.value.toFixed(1)}${unit}`
-            doc.text(displayValue, 22, yPos + 15)
-            
-            // Assessment Badge
-            if (metric.assessment) {
-              const assessColor = metric.assessment.toLowerCase().includes('good') || 
-                                 metric.assessment.toLowerCase().includes('excellent') ? [16, 185, 129] :
-                                 metric.assessment.toLowerCase().includes('concern') ||
-                                 metric.assessment.toLowerCase().includes('high') ? [244, 63, 94] :
-                                 [251, 191, 36]
-              doc.setFillColor(assessColor[0], assessColor[1], assessColor[2])
-              doc.roundedRect(140, yPos + 3, 48, 6, 1, 1, 'F')
-              doc.setFontSize(7)
-              doc.setTextColor(255, 255, 255)
-              const assessText = metric.assessment.substring(0, 22)
-              doc.text(assessText, 164, yPos + 7, { align: 'center' })
-            }
-            
-            yPos += 26
-          }
-        })
-      }
 
-      // ==================== PAGE 4: OFFICER COMMENTS ====================
+      // ==================== PAGE 3: OFFICER COMMENTS ====================
       if (appData.comment) {
         if (yPos > 200) {
           doc.addPage()
@@ -902,14 +789,16 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
           yPos += 10
         }
         
-        // Section Header
-        doc.setFillColor(234, 179, 8) // yellow-500
-        doc.rect(0, yPos - 5, 210, 12, 'F')
-        doc.setTextColor(255, 255, 255)
+        // Section Header - Professional
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.5)
+        doc.line(20, yPos, 190, yPos)
+        doc.setTextColor(0, 0, 0)
         doc.setFontSize(16)
         doc.setFont('helvetica', 'bold')
-        doc.text('OFFICER COMMENTS', 105, yPos + 3, { align: 'center' })
-        yPos += 15
+        doc.text('OFFICER COMMENTS', 105, yPos + 8, { align: 'center' })
+        doc.line(20, yPos + 12, 190, yPos + 12)
+        yPos += 20
         
         doc.setTextColor(0, 0, 0)
         doc.setFontSize(10)
