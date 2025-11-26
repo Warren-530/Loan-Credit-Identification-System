@@ -115,6 +115,133 @@ async def get_applications(limit: int = 50):
         ]
 
 
+@app.get("/api/analytics/summary")
+async def get_analytics_summary():
+    """Get aggregated analytics data for portfolio dashboard"""
+    with get_session() as session:
+        apps = session.query(Application).all()
+        
+        total = len(apps)
+        if total == 0:
+            return {
+                "kpi": {
+                    "total_applications": 0,
+                    "total_exposure": 0,
+                    "avg_risk_score": 0,
+                    "approval_rate": 0,
+                    "avg_processing_time": "0s",
+                    "ai_human_agreement": 0
+                },
+                "charts": {
+                    "score_distribution": [],
+                    "loan_composition": [],
+                    "top_risk_flags": [],
+                    "status_breakdown": []
+                },
+                "overrides": []
+            }
+        
+        # KPI Calculations
+        approved = [a for a in apps if a.final_decision == "Approved"]
+        rejected = [a for a in apps if a.final_decision == "Rejected"]
+        
+        # Total Exposure (sum of approved loan amounts)
+        total_exposure = sum([a.requested_amount for a in approved if a.requested_amount])
+        
+        # Average Risk Score
+        scores = [a.risk_score for a in apps if a.risk_score is not None]
+        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+        
+        # Approval Rate
+        approval_rate = round((len(approved) / total * 100), 1) if total > 0 else 0
+        
+        # Average Processing Time
+        processing_times = [a.processing_time for a in apps if a.processing_time]
+        avg_time = sum(processing_times) / len(processing_times) if processing_times else 0
+        avg_time_str = f"{avg_time:.1f}s" if avg_time < 60 else f"{avg_time/60:.1f}m"
+        
+        # AI-Human Agreement Rate
+        reviewed = [a for a in apps if a.review_status in [ReviewStatus.HUMAN_VERIFIED, ReviewStatus.MANUAL_OVERRIDE]]
+        agreements = [a for a in reviewed if a.ai_decision == a.human_decision]
+        ai_agreement = round((len(agreements) / len(reviewed) * 100), 1) if reviewed else 100
+        
+        # Risk Score Distribution
+        score_dist = [
+            {"range": "0-20", "count": len([s for s in scores if s <= 20])},
+            {"range": "21-40", "count": len([s for s in scores if 20 < s <= 40])},
+            {"range": "41-60", "count": len([s for s in scores if 40 < s <= 60])},
+            {"range": "61-80", "count": len([s for s in scores if 60 < s <= 80])},
+            {"range": "81-100", "count": len([s for s in scores if 80 < s <= 100])},
+        ]
+        
+        # Loan Type Composition - Extract from analysis_result
+        loan_types = {}
+        for a in apps:
+            l_type = "Unknown"
+            # First try to get from analysis_result (where AI stores it)
+            if a.analysis_result and "applicant_profile" in a.analysis_result:
+                l_type = a.analysis_result["applicant_profile"].get("loan_type", "Unknown")
+            # Fallback to loan_type field if exists
+            elif a.loan_type:
+                l_type = a.loan_type.value if hasattr(a.loan_type, 'value') else str(a.loan_type)
+            loan_types[l_type] = loan_types.get(l_type, 0) + 1
+        loan_composition = [{"name": k, "value": v} for k, v in loan_types.items()]
+        
+        # Top Risk Flags from analysis results
+        risk_flags_count = {}
+        for a in apps:
+            if a.analysis_result and "key_risk_flags" in a.analysis_result:
+                for flag in a.analysis_result["key_risk_flags"]:
+                    flag_name = flag.get("flag", "Unknown")
+                    risk_flags_count[flag_name] = risk_flags_count.get(flag_name, 0) + 1
+        
+        top_risk_flags = sorted(
+            [{"name": k, "count": v} for k, v in risk_flags_count.items()],
+            key=lambda x: x["count"],
+            reverse=True
+        )[:5]
+        
+        # Application Status Breakdown
+        status_breakdown = {
+            "Approved": len([a for a in apps if a.final_decision == "Approved"]),
+            "Rejected": len([a for a in apps if a.final_decision == "Rejected"]),
+            "Pending Review": len([a for a in apps if a.status == ApplicationStatus.REVIEW_REQUIRED]),
+            "Processing": len([a for a in apps if a.status == ApplicationStatus.PROCESSING or a.status == ApplicationStatus.ANALYZING]),
+        }
+        status_chart = [{"name": k, "count": v} for k, v in status_breakdown.items() if v > 0]
+        
+        # Human Override Log
+        overrides = []
+        for a in apps:
+            if a.review_status == ReviewStatus.MANUAL_OVERRIDE:
+                overrides.append({
+                    "id": a.application_id,
+                    "name": a.applicant_name or "Unknown",
+                    "ai_decision": a.ai_decision or "N/A",
+                    "human_decision": a.human_decision or "N/A",
+                    "reason": a.override_reason or "No reason provided",
+                    "date": a.reviewed_at.strftime("%Y-%m-%d") if a.reviewed_at else a.updated_at.strftime("%Y-%m-%d")
+                })
+        
+        return {
+            "kpi": {
+                "total_applications": total,
+                "total_exposure": total_exposure,
+                "avg_risk_score": avg_score,
+                "approval_rate": approval_rate,
+                "avg_processing_time": avg_time_str,
+                "ai_human_agreement": ai_agreement
+            },
+            "charts": {
+                "score_distribution": score_dist,
+                "loan_composition": loan_composition,
+                "top_risk_flags": top_risk_flags,
+                "status_breakdown": status_chart
+            },
+            "overrides": sorted(overrides, key=lambda x: x["date"], reverse=True)[:5]
+        }
+
+
 @app.get("/api/application/{application_id}")
 async def get_application(application_id: str):
     """Get specific application details"""
