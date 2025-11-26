@@ -536,7 +536,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(24)
       doc.setFont('helvetica', 'bold')
-      doc.text('TRUSTLENS AI', 20, 20)
+      doc.text('INSIGHTLOAN', 20, 20)
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
       doc.text('Credit Risk Assessment Report', 20, 30)
@@ -929,7 +929,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       }
       
       // Save PDF
-      doc.save(`TrustLens_Report_${resolvedParams.id}_${new Date().toISOString().split('T')[0]}.pdf`)
+      doc.save(`InsightLoan_Report_${resolvedParams.id}_${new Date().toISOString().split('T')[0]}.pdf`)
     } catch (error) {
       console.error('Export failed:', error)
     } finally {

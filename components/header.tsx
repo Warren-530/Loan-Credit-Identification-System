@@ -26,7 +26,7 @@ export function Header() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
       <div className="flex items-center">
-        <h2 className="text-lg font-semibold text-slate-900">TrustLens AI</h2>
+        <h2 className="text-lg font-semibold text-slate-900">InsightLoan</h2>
       </div>
       <div className="flex items-center space-x-4">
         <NotificationCenter />

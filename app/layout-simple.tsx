@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TrustLens AI - Credit Risk Assessment",
+  title: "InsightLoan - Credit Risk Assessment",
   description: "AI-powered credit risk assessment platform",
 };
 

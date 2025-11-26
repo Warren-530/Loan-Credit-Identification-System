@@ -268,7 +268,7 @@ export default function SettingsPage() {
 
       // Build comprehensive log text
       let logText = '='.repeat(80) + '\n'
-      logText += 'TRUSTLENS AI - SYSTEM ACTIVITY LOG\n'
+      logText += 'INSIGHTLOAN - SYSTEM ACTIVITY LOG\n'
       logText += '='.repeat(80) + '\n'
       logText += `Generated: ${new Date().toLocaleString()}\n`
       logText += `Total Audit Logs: ${auditLogs.length}\n`

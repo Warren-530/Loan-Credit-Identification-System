@@ -275,7 +275,7 @@ export default function ApplicationsPage() {
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(24)
         doc.setFont('helvetica', 'bold')
-        doc.text('TRUSTLENS AI', 20, 20)
+        doc.text('INSIGHTLOAN', 20, 20)
         doc.setFontSize(12)
         doc.setFont('helvetica', 'normal')
         doc.text('Credit Risk Assessment Report', 20, 30)
@@ -526,7 +526,7 @@ export default function ApplicationsPage() {
         }
         
         // Save PDF with unique name
-        doc.save(`TrustLens_Report_${app.id}_${new Date().toISOString().split('T')[0]}.pdf`)
+        doc.save(`InsightLoan_Report_${app.id}_${new Date().toISOString().split('T')[0]}.pdf`)
         
         // Small delay between exports
         await new Promise(resolve => setTimeout(resolve, 500))

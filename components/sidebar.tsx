@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, FileText, Settings, ShieldCheck, BarChart3 } from "lucide-react"
+import { LayoutDashboard, FileText, Settings, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Logo } from "@/components/logo"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -18,8 +19,8 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r bg-slate-900 text-white">
       <div className="flex h-16 items-center px-6 border-b border-slate-800">
-        <ShieldCheck className="h-8 w-8 text-emerald-400 mr-2" />
-        <span className="text-xl font-bold tracking-tight">TrustLens AI</span>
+        <Logo className="h-9 w-9 mr-3 flex-shrink-0" />
+        <span className="text-xl font-bold tracking-tight">InsightLoan</span>
       </div>
       <nav className="flex-1 space-y-1 px-2 py-4">
         {navigation.map((item) => {

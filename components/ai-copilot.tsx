@@ -24,7 +24,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: "assistant", 
-      content: "Hello! I'm TrustLens Copilot. I've analyzed this applicant's documents (Application Form, Bank Statement, Loan Essay, Payslip, and Supporting Docs). Ask me anything about their risk profile, transactions, or claims.",
+      content: "Hello! I'm InsightLoan Copilot. I've analyzed this applicant's documents (Application Form, Bank Statement, Loan Essay, Payslip, and Supporting Docs). Ask me anything about their risk profile, transactions, or claims.",
       sources: []
     }
   ])
@@ -207,7 +207,7 @@ export function AICopilot({ applicationId }: AICopilotProps) {
           >
             <div className="flex items-center pointer-events-none">
               <Bot className="h-5 w-5 mr-2" />
-              <CardTitle className="text-base">TrustLens Copilot</CardTitle>
+              <CardTitle className="text-base">InsightLoan Copilot</CardTitle>
             </div>
             <div className="flex items-center gap-1">
               <Button 
