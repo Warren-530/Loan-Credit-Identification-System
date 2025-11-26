@@ -23,6 +23,8 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [showReasoningStream, setShowReasoningStream] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [showOverrideDialog, setShowOverrideDialog] = useState(false)
+  const [showCommentDialog, setShowCommentDialog] = useState(false)
+  const [commentText, setCommentText] = useState("")
   const [pendingDecision, setPendingDecision] = useState<string | null>(null)
   const [overrideReason, setOverrideReason] = useState("")
   const [currentPosition] = useState<number>(1) // position tracking placeholder
@@ -182,6 +184,30 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       setIsPolling(true)
     } catch (e) {
       console.error('Retry failed:', e)
+    }
+  }
+
+  useEffect(() => {
+    if (appData?.comment) {
+      setCommentText(appData.comment)
+    }
+  }, [appData])
+
+  const handleSaveComment = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: commentText })
+      })
+      
+      if (response.ok) {
+        const updated = await api.getApplication(resolvedParams.id)
+        setAppData(updated)
+        setShowCommentDialog(false)
+      }
+    } catch (error) {
+      console.error('Failed to save comment:', error)
     }
   }
 
@@ -769,6 +795,32 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
           }
         })
       }
+
+      // ==================== PAGE 4: OFFICER COMMENTS ====================
+      if (appData.comment) {
+        if (yPos > 200) {
+          doc.addPage()
+          yPos = 20
+        } else {
+          yPos += 10
+        }
+        
+        // Section Header
+        doc.setFillColor(234, 179, 8) // yellow-500
+        doc.rect(0, yPos - 5, 210, 12, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.text('OFFICER COMMENTS', 105, yPos + 3, { align: 'center' })
+        yPos += 15
+        
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        
+        const commentLines = doc.splitTextToSize(appData.comment, 170)
+        doc.text(commentLines, 20, yPos)
+      }
       
       // Footer on all pages - Page number only
       const pageCount = doc.getNumberOfPages()
@@ -947,6 +999,17 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </Button>
                 )}
               </div>
+
+              {/* Comment Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-slate-600 border-slate-300 hover:bg-slate-50 w-full"
+                onClick={() => setShowCommentDialog(true)}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                {appData.comment ? "Edit Comment" : "Add Comment"}
+              </Button>
 
               {/* Rapid Review Navigation - Second Row */}
               <div className="flex items-center gap-2">
@@ -1703,6 +1766,20 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
           </Card>
         )}
 
+        {/* Comment Section - NEW */}
+        {appData.comment && (
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-yellow-600" />
+                Officer Comments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-800 whitespace-pre-wrap">{appData.comment}</p>
+            </CardContent>
+          </Card>
+        )}
         
         {/* Decision Audit History Panel */}
         <Card className="mt-auto">
@@ -1839,6 +1916,42 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               disabled={!overrideReason.trim()}
             >
               Confirm Override
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comment Dialog - NEW */}
+      <Dialog open={showCommentDialog} onOpenChange={setShowCommentDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Additional Comments</DialogTitle>
+            <DialogDescription>
+              Provide any additional comments for the application decision.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="comment-text">Your Comments</Label>
+              <Textarea
+                id="comment-text"
+                placeholder="E.g., Consider alternative income sources..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                rows={10}
+                className="max-h-[60vh]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCommentDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveComment}
+              disabled={!commentText.trim()}
+            >
+              Save Comment
             </Button>
           </DialogFooter>
         </DialogContent>

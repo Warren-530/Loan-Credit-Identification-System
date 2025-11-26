@@ -188,6 +188,7 @@ async def get_application(application_id: str):
             "reviewed_by": app.reviewed_by,
             "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
             "override_reason": app.override_reason,
+            "comment": app.comment,
             "decision_history": app.decision_history or [],
             "application_form_url": application_form_url,
             "bank_statement_url": bank_url,
@@ -198,6 +199,23 @@ async def get_application(application_id: str):
             "supporting_doc_3_url": supporting_doc_3_url,
             "file_metadata": file_metadata,
         }
+
+
+class CommentRequest(BaseModel):
+    comment: str
+
+@app.post("/api/application/{application_id}/comment")
+async def save_comment(application_id: str, request: CommentRequest):
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        app.comment = request.comment
+        session.add(app)
+        session.commit()
+        
+        return {"status": "success", "comment": app.comment}
 
 
 @app.delete("/api/application/{application_id}")

@@ -654,7 +654,7 @@ export default function ApplicationsPage() {
                     onCheckedChange={selectAll}
                   />
                 </TableHead>
-                <TableHead>Applicant ID</TableHead>
+                <TableHead>Application ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Loan Type</TableHead>
                 <TableHead>Amount</TableHead>

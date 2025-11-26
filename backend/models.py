@@ -56,6 +56,7 @@ class Application(SQLModel, table=True):
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     override_reason: Optional[str] = None
+    comment: Optional[str] = None
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

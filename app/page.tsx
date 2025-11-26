@@ -105,7 +105,7 @@ export default function Dashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Applicant ID</TableHead>
+                <TableHead>Application ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Loan Type</TableHead>
                 <TableHead>Amount</TableHead>

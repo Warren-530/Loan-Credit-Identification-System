@@ -43,6 +43,7 @@ export interface ApplicationDetail {
     details?: string;
     reason?: string;
   }>;
+  comment?: string;
   created_at: string;
   analysis_result: Record<string, unknown> | null;
   document_texts?: {

@@ -18,7 +18,8 @@ def migrate():
     new_columns = [
         ("supporting_doc_1_path", "VARCHAR"),
         ("supporting_doc_2_path", "VARCHAR"),
-        ("supporting_doc_3_path", "VARCHAR")
+        ("supporting_doc_3_path", "VARCHAR"),
+        ("comment", "TEXT")
     ]
     
     for col_name, col_type in new_columns:
