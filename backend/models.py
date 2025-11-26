@@ -78,6 +78,17 @@ class Application(SQLModel, table=True):
     
     # Decision Audit History (JSON array)
     decision_history: Optional[List[dict]] = Field(default_factory=list, sa_column=Column(JSON))
+    
+    # Decision Locking Fields
+    decision_locked: bool = Field(default=False)  # Prevents further changes once locked
+    decision_locked_at: Optional[datetime] = None  # When decision was finalized
+    decision_locked_by: Optional[str] = None  # Who finalized the decision
+    
+    # Email Notification Fields
+    email_sent: bool = Field(default=False)  # Whether notification email was sent
+    email_sent_at: Optional[datetime] = None  # When email was sent
+    email_status: Optional[str] = None  # 'pending', 'sent', 'failed'
+    email_error: Optional[str] = None  # Error message if sending failed
 
 
 class AnalysisCache(SQLModel, table=True):
@@ -102,6 +113,14 @@ class RiskPolicy(SQLModel, table=True):
     max_loan_car: float = Field(default=150000.0)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     updated_by: str = Field(default="System")
+    
+    # Email Notification Settings
+    email_notification_mode: str = Field(default="manual")  # 'auto' or 'manual'
+    smtp_enabled: bool = Field(default=False)
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_from_email: Optional[str] = None
 
 
 class AuditLog(SQLModel, table=True):

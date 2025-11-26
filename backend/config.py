@@ -5,6 +5,10 @@ Centralizes all hardcoded values for maintainability
 import os
 from typing import Dict, List
 from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Environment Configuration
 @dataclass(frozen=True)
@@ -28,6 +32,14 @@ class Config:
     
     # Default Values
     DEFAULT_REVIEWER: str = "Credit Officer"
+    
+    # Email Configuration
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")  # Gmail address
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")  # Gmail app password
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")  # From email address
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "TrustLens AI")
     DEFAULT_LOAN_TENURE: int = 24
     CURRENCY: str = "RM"
     

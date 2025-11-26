@@ -24,6 +24,11 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [isExporting, setIsExporting] = useState(false)
   const [showOverrideDialog, setShowOverrideDialog] = useState(false)
   const [showCommentDialog, setShowCommentDialog] = useState(false)
+  const [showLockConfirmDialog, setShowLockConfirmDialog] = useState(false)
+  const [showSendEmailDialog, setShowSendEmailDialog] = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
+  const [isLocking, setIsLocking] = useState(false)
+  const [emailResult, setEmailResult] = useState<{success: boolean; message: string} | null>(null)
   const [commentText, setCommentText] = useState("")
   const [pendingDecision, setPendingDecision] = useState<string | null>(null)
   const [overrideReason, setOverrideReason] = useState("")
@@ -137,19 +142,29 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   // (handleNavigate already defined above)
   
   const handleDecisionClick = (decision: string) => {
+    // Check if decision is already locked
+    if (appData?.decision_locked) {
+      alert('Decision is locked and cannot be changed.')
+      return
+    }
+    
     const aiDecision = appData?.ai_decision || finalDecision
     const isOverride = aiDecision && decision !== aiDecision
     
+    setPendingDecision(decision)
+    
     if (isOverride) {
-      setPendingDecision(decision)
+      // Override case: show override reason dialog
       setShowOverrideDialog(true)
     } else {
-      void submitDecision(decision, null)
+      // Same as AI: directly submit verify then show lock dialog
+      submitDecisionAndShowLock(decision, null)
     }
   }
   
-  const submitDecision = async (decision: string, reason: string | null) => {
+  const submitDecisionAndShowLock = async (decision: string, reason: string | null) => {
     try {
+      // Submit decision (verify)
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -161,17 +176,99 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       })
       
       const result = await response.json()
-      console.log('Decision submitted, response:', result)
+      console.log('Decision verified, response:', result)
+      
+      // Reload application data to update review_status
+      const data = await api.getApplication(resolvedParams.id)
+      console.log('Reloaded app data after verify, review_status:', data.review_status)
+      setAppData(data)
+      
+      // Show lock confirmation dialog
+      setShowOverrideDialog(false)
+      setOverrideReason('')
+      setShowLockConfirmDialog(true)
+      
+    } catch (error) {
+      console.error('Decision submission failed:', error)
+    }
+  }
+  
+  const submitDecision = async (decision: string, reason: string | null) => {
+    // This is called from the override dialog
+    await submitDecisionAndShowLock(decision, reason)
+  }
+  
+  const handleLockDecision = async () => {
+    setIsLocking(true)
+    try {
+      // Lock the decision
+      const lockResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/lock-decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewer_name: process.env.NEXT_PUBLIC_DEFAULT_REVIEWER || 'Credit Officer'
+        })
+      })
+      
+      const lockResult = await lockResponse.json()
+      console.log('Decision locked, response:', lockResult)
       
       // Reload application data
       const data = await api.getApplication(resolvedParams.id)
-      console.log('Reloaded app data, decision_history:', data.decision_history)
+      console.log('Reloaded app data after lock:', {
+        decision_locked: data.decision_locked,
+        email_sent: data.email_sent,
+        email_status: data.email_status,
+        review_status: data.review_status
+      })
       setAppData(data)
-      setShowOverrideDialog(false)
-      setOverrideReason('')
+      setShowLockConfirmDialog(false)
       setPendingDecision(null)
+      
+      // If auto mode and email was sent, show notification
+      if (lockResult.email_sent) {
+        setEmailResult({ success: true, message: 'Email notification sent automatically' })
+        setTimeout(() => setEmailResult(null), 5000)
+      } else if (lockResult.email_mode === 'manual') {
+        // In manual mode, show send email dialog
+        setShowSendEmailDialog(true)
+      }
+      
     } catch (error) {
-      console.error('Decision submission failed:', error)
+      console.error('Lock decision failed:', error)
+    } finally {
+      setIsLocking(false)
+    }
+  }
+  
+  const handleSendEmail = async () => {
+    setEmailSending(true)
+    setEmailResult(null)
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/application/${resolvedParams.id}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewer_name: process.env.NEXT_PUBLIC_DEFAULT_REVIEWER || 'Credit Officer'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setEmailResult({ success: true, message: `Email sent successfully to ${result.recipient}` })
+        // Reload data to update email status
+        const data = await api.getApplication(resolvedParams.id)
+        setAppData(data)
+      } else {
+        setEmailResult({ success: false, message: result.error || 'Failed to send email' })
+      }
+      
+    } catch (error) {
+      setEmailResult({ success: false, message: 'Network error: Could not send email' })
+    } finally {
+      setEmailSending(false)
     }
   }
 
@@ -967,26 +1064,35 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   )}
                 </Button>
                 
-                {/* Manual Decision Buttons */}
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="text-rose-600 border-rose-300 hover:bg-rose-50"
-                  onClick={() => handleDecisionClick('Rejected')}
-                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                >
-                  <AlertTriangle className="mr-1 h-3 w-3" />
-                  Reject
-                </Button>
-                <Button 
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => handleDecisionClick('Approved')}
-                  disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
-                >
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                  Approve
-                </Button>
+                {/* Manual Decision Buttons - Show locked state if decision is locked */}
+                {appData.decision_locked ? (
+                  <Badge className="bg-slate-700 text-white border-slate-600 px-3 py-1.5">
+                    <Shield className="h-3 w-3 mr-1.5" />
+                    Decision Locked by {appData.decision_locked_by}
+                  </Badge>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-rose-600 border-rose-300 hover:bg-rose-50"
+                      onClick={() => handleDecisionClick('Rejected')}
+                      disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                    >
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      Reject
+                    </Button>
+                    <Button 
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => handleDecisionClick('Approved')}
+                      disabled={appData.status === 'Processing' || appData.status === 'Analyzing'}
+                    >
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      Approve
+                    </Button>
+                  </>
+                )}
                 
                 {appData.status === 'Failed' && (
                   <Button 
@@ -997,6 +1103,39 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   >
                     Retry Analysis
                   </Button>
+                )}
+                
+                {/* Send Email Button (manual mode, decision locked, email not sent) */}
+                {appData.decision_locked && !appData.email_sent && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    onClick={() => setShowSendEmailDialog(true)}
+                  >
+                    <MessageSquare className="mr-1 h-3 w-3" />
+                    Send Email
+                  </Button>
+                )}
+                
+                {/* Email Status Badge */}
+                {appData.decision_locked && appData.email_status && (
+                  <Badge 
+                    variant="outline"
+                    className={
+                      appData.email_status === 'sent' 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : appData.email_status === 'unsent'
+                        ? 'bg-slate-50 text-slate-600 border-slate-300'
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                    }
+                  >
+                    {appData.email_status === 'sent' 
+                      ? '✓ Email Sent' 
+                      : appData.email_status === 'unsent'
+                      ? '○ Email Unsent'
+                      : '✗ Email Failed'}
+                  </Badge>
                 )}
               </div>
 
@@ -1953,6 +2092,138 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
             >
               Save Comment
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lock Decision Confirmation Dialog */}
+      <Dialog open={showLockConfirmDialog} onOpenChange={setShowLockConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="h-5 w-5" />
+              Lock Decision Permanently
+            </DialogTitle>
+            <DialogDescription>
+              You are about to finalize this decision. Once locked, it CANNOT be changed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Warning: This action is irreversible!</strong>
+                <br />
+                <br />
+                Final Decision: <strong>{pendingDecision}</strong>
+                <br />
+                Applicant: <strong>{appData?.name}</strong>
+                <br />
+                Application ID: <strong>{resolvedParams.id}</strong>
+              </AlertDescription>
+            </Alert>
+            <div className="bg-slate-50 p-4 rounded-lg space-y-2">
+              <p className="text-sm font-semibold text-slate-900">What happens next:</p>
+              <ul className="text-xs text-slate-700 space-y-1 list-disc list-inside">
+                <li>Decision will be locked permanently</li>
+                <li>Approve/Reject buttons will be disabled</li>
+                <li>Email notification may be sent to applicant (based on settings)</li>
+                <li>This action will be logged in audit trail</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowLockConfirmDialog(false)
+                setPendingDecision(null)
+              }}
+              disabled={isLocking}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleLockDecision}
+              disabled={isLocking}
+            >
+              {isLocking ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Processing...
+                </>
+              ) : (
+                'Lock Decision'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Email Dialog (Manual Mode) */}
+      <Dialog open={showSendEmailDialog} onOpenChange={setShowSendEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Decision Email to Applicant</DialogTitle>
+            <DialogDescription>
+              Send an email notification to the applicant about the loan decision.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {emailResult ? (
+              <Alert variant={emailResult.success ? "default" : "destructive"}>
+                {emailResult.success ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                <AlertDescription>{emailResult.message}</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+                  <p className="text-sm font-semibold text-slate-900">Email Details:</p>
+                  <ul className="text-xs text-slate-700 space-y-1">
+                    <li><strong>Recipient:</strong> {appData?.analysis_result && typeof appData.analysis_result === 'object' ? 
+                      (appData.analysis_result as any)?.applicant_profile?.email || 'Email not found' : 'Email not found'}</li>
+                    <li><strong>Decision:</strong> {appData?.final_decision}</li>
+                    <li><strong>Application ID:</strong> {resolvedParams.id}</li>
+                  </ul>
+                </div>
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    The email will include the decision and a comprehensive assessment report.
+                  </AlertDescription>
+                </Alert>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            {emailResult ? (
+              <Button onClick={() => {
+                setShowSendEmailDialog(false)
+                setEmailResult(null)
+              }}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setShowSendEmailDialog(false)}>
+                  Skip
+                </Button>
+                <Button 
+                  onClick={handleSendEmail}
+                  disabled={emailSending}
+                >
+                  {emailSending ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Email'
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

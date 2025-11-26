@@ -43,6 +43,15 @@ export interface ApplicationDetail {
     details?: string;
     reason?: string;
   }>;
+  // Decision Locking Fields
+  decision_locked?: boolean;
+  decision_locked_at?: string;
+  decision_locked_by?: string;
+  // Email Notification Fields
+  email_sent?: boolean;
+  email_sent_at?: string;
+  email_status?: string;
+  email_error?: string;
   comment?: string;
   created_at: string;
   analysis_result: Record<string, unknown> | null;

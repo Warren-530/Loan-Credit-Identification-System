@@ -23,6 +23,8 @@ from database import init_db, get_session
 from pdf_processor import PDFProcessor, TextProcessor
 from ai_engine import AIEngine
 from config import Config, RiskConfig, LoanConfig, AIConfig
+from email_service import email_service
+from report_generator import ReportGenerator
 
 # Configure Tesseract OCR path (D: drive installation)
 if os.path.exists(r'D:\Tesseract\tesseract.exe'):
@@ -439,6 +441,13 @@ async def get_application(application_id: str):
             "override_reason": app.override_reason,
             "comment": app.comment,
             "decision_history": app.decision_history or [],
+            "decision_locked": app.decision_locked or False,
+            "decision_locked_at": app.decision_locked_at.isoformat() if app.decision_locked_at else None,
+            "decision_locked_by": app.decision_locked_by,
+            "email_sent": app.email_sent or False,
+            "email_sent_at": app.email_sent_at.isoformat() if app.email_sent_at else None,
+            "email_status": app.email_status,
+            "email_error": app.email_error,
             "application_form_url": application_form_url,
             "bank_statement_url": bank_url,
             "essay_url": essay_url,
@@ -1149,7 +1158,7 @@ async def verify_application(
     application_id: str,
     request: VerifyRequest
 ):
-    """Human verification/override of AI decision"""
+    """Human verification/override of AI decision (does NOT lock the decision)"""
     from models import AuditLog
     
     with get_session() as session:
@@ -1157,6 +1166,13 @@ async def verify_application(
         
         if not app:
             raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Check if decision is already locked
+        if app.decision_locked:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Decision is locked and cannot be changed. Locked by {app.decision_locked_by} on {app.decision_locked_at}"
+            )
         
         # Determine if this is an override
         is_override = app.ai_decision and request.decision != app.ai_decision
@@ -1224,6 +1240,302 @@ async def verify_application(
             "review_status": app.review_status,
             "is_override": is_override,
             "decision_history": app.decision_history
+        }
+
+
+# Pydantic model for lock decision request
+class LockDecisionRequest(BaseModel):
+    reviewer_name: str = Config().DEFAULT_REVIEWER
+
+
+@app.post("/api/application/{application_id}/lock-decision")
+async def lock_decision(
+    application_id: str,
+    request: LockDecisionRequest
+):
+    """
+    Lock the final decision to prevent further changes
+    This endpoint should be called after verify to make the decision permanent
+    """
+    from models import AuditLog, RiskPolicy
+    
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Check if already locked
+        if app.decision_locked:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Decision is already locked by {app.decision_locked_by} on {app.decision_locked_at}"
+            )
+        
+        # Must have a human decision before locking
+        if not app.human_decision:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot lock decision - application has not been reviewed yet"
+            )
+        
+        # Lock the decision
+        app.decision_locked = True
+        app.decision_locked_at = datetime.utcnow()
+        app.decision_locked_by = request.reviewer_name
+        
+        # Add to decision history
+        if app.decision_history is None:
+            app.decision_history = []
+        
+        lock_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "actor": request.reviewer_name,
+            "action": "Locked Decision",
+            "details": f"Final decision '{app.final_decision}' locked and cannot be changed"
+        }
+        app.decision_history = app.decision_history + [lock_entry]
+        flag_modified(app, "decision_history")
+        
+        # Create audit log
+        log = AuditLog(
+            user=request.reviewer_name,
+            action=f"Locked Decision: {app.final_decision}",
+            details=f"Application {application_id} - {app.applicant_name or 'Unknown'} - Decision is now final",
+            application_id=application_id
+        )
+        session.add(log)
+        
+        # Get email notification settings
+        policy = session.query(RiskPolicy).first()
+        email_mode = policy.email_notification_mode if policy else "manual"
+        
+        # AUTO mode: Send email immediately after locking
+        email_result = None
+        if email_mode == "auto" and policy and policy.smtp_enabled:
+            # Extract applicant email from analysis_result
+            applicant_email = None
+            if app.analysis_result and isinstance(app.analysis_result, dict):
+                applicant_profile = app.analysis_result.get("applicant_profile", {})
+                applicant_email = applicant_profile.get("email")
+            
+            if applicant_email:
+                # Generate PDF report
+                report_gen = ReportGenerator()
+                pdf_path = None
+                try:
+                    # Extract DSR from analysis_result if available
+                    final_dsr = None
+                    if app.analysis_result and isinstance(app.analysis_result, dict):
+                        financial_metrics = app.analysis_result.get("financial_metrics", {})
+                        if financial_metrics and isinstance(financial_metrics, dict):
+                            dsr_metric = financial_metrics.get("debt_service_ratio", {})
+                            if isinstance(dsr_metric, dict):
+                                final_dsr = dsr_metric.get("value")
+                    
+                    pdf_path = report_gen.generate_decision_report(
+                        application_id=application_id,
+                        applicant_name=app.applicant_name or "Applicant",
+                        decision=app.final_decision,
+                        loan_type=app.loan_type or "Loan",
+                        requested_amount=app.requested_amount or 0,
+                        risk_score=app.risk_score or 0,
+                        analysis_result=app.analysis_result,
+                        final_dsr=final_dsr
+                    )
+                except Exception as e:
+                    print(f"Warning: Could not generate PDF report: {e}")
+                
+                # Send email with PDF attached
+                decision_justification = None
+                if app.analysis_result and isinstance(app.analysis_result, dict):
+                    decision_just = app.analysis_result.get("decision_justification", {})
+                    if isinstance(decision_just, dict):
+                        decision_justification = decision_just.get("overall_assessment")
+                
+                email_result = email_service.send_decision_email(
+                    to_email=applicant_email,
+                    applicant_name=app.applicant_name or "Applicant",
+                    application_id=application_id,
+                    decision=app.final_decision,
+                    loan_type=app.loan_type or "Loan",
+                    requested_amount=app.requested_amount or 0,
+                    risk_score=app.risk_score,
+                    pdf_path=pdf_path,
+                    decision_justification=decision_justification,
+                    db_session=session
+                )
+                
+                if email_result["status"] == "sent":
+                    app.email_sent = True
+                    app.email_sent_at = datetime.utcnow()
+                    app.email_status = "sent"
+                    
+                    # Add email sent to history
+                    email_entry = {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "actor": "System (Auto)",
+                        "action": "Email Sent",
+                        "details": f"Decision notification sent to {applicant_email}"
+                    }
+                    app.decision_history = app.decision_history + [email_entry]
+                    flag_modified(app, "decision_history")
+                else:
+                    app.email_status = "failed"
+                    app.email_error = email_result.get("error")
+            else:
+                # Manual mode - set status to unsent initially
+                app.email_status = "unsent"
+        
+        app.updated_at = datetime.utcnow()
+        session.add(app)
+        session.commit()
+        session.refresh(app)
+        
+        return {
+            "success": True,
+            "locked": True,
+            "locked_at": app.decision_locked_at.isoformat(),
+            "locked_by": app.decision_locked_by,
+            "email_mode": email_mode,
+            "email_sent": app.email_sent,
+            "email_status": app.email_status,
+            "email_result": email_result
+        }
+
+
+# Pydantic model for send email request
+class SendEmailRequest(BaseModel):
+    reviewer_name: str = Config().DEFAULT_REVIEWER
+    include_pdf: bool = False  # Frontend will handle PDF generation and upload
+
+
+@app.post("/api/application/{application_id}/send-email")
+async def send_email_notification(
+    application_id: str,
+    request: SendEmailRequest
+):
+    """
+    Manually send decision email to applicant (for manual mode)
+    This is used when email_notification_mode is set to 'manual'
+    """
+    from models import AuditLog
+    
+    with get_session() as session:
+        app = session.query(Application).filter(Application.application_id == application_id).first()
+        
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Must be locked before sending email
+        if not app.decision_locked:
+            raise HTTPException(
+                status_code=400,
+                detail="Decision must be locked before sending email notification"
+            )
+        
+        # Extract applicant email
+        applicant_email = None
+        if app.analysis_result and isinstance(app.analysis_result, dict):
+            applicant_profile = app.analysis_result.get("applicant_profile", {})
+            applicant_email = applicant_profile.get("email")
+        
+        if not applicant_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Applicant email not found in application data"
+            )
+        
+        # Get decision justification
+        decision_justification = None
+        if app.analysis_result and isinstance(app.analysis_result, dict):
+            decision_just = app.analysis_result.get("decision_justification", {})
+            if isinstance(decision_just, dict):
+                decision_justification = decision_just.get("overall_assessment")
+        
+        # Generate PDF report
+        report_gen = ReportGenerator()
+        pdf_path = None
+        try:
+            # Extract DSR from analysis_result if available
+            final_dsr = None
+            if app.analysis_result and isinstance(app.analysis_result, dict):
+                financial_metrics = app.analysis_result.get("financial_metrics", {})
+                if financial_metrics and isinstance(financial_metrics, dict):
+                    dsr_metric = financial_metrics.get("debt_service_ratio", {})
+                    if isinstance(dsr_metric, dict):
+                        final_dsr = dsr_metric.get("value")
+            
+            pdf_path = report_gen.generate_decision_report(
+                application_id=application_id,
+                applicant_name=app.applicant_name or "Applicant",
+                decision=app.final_decision,
+                loan_type=app.loan_type or "Loan",
+                requested_amount=app.requested_amount or 0,
+                risk_score=app.risk_score or 0,
+                analysis_result=app.analysis_result,
+                final_dsr=final_dsr
+            )
+        except Exception as e:
+            print(f"Warning: Could not generate PDF report: {e}")
+        
+        # Send email with PDF attached
+        email_result = email_service.send_decision_email(
+            to_email=applicant_email,
+            applicant_name=app.applicant_name or "Applicant",
+            application_id=application_id,
+            decision=app.final_decision,
+            loan_type=app.loan_type or "Loan",
+            requested_amount=app.requested_amount or 0,
+            risk_score=app.risk_score,
+            pdf_path=pdf_path,
+            decision_justification=decision_justification,
+            db_session=session
+        )
+        
+        # Update application email status
+        if email_result["status"] == "sent":
+            app.email_sent = True
+            app.email_sent_at = datetime.utcnow()
+            app.email_status = "sent"
+            app.email_error = None
+            
+            # Add to decision history
+            if app.decision_history is None:
+                app.decision_history = []
+            
+            email_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "actor": request.reviewer_name,
+                "action": "Email Sent (Manual)",
+                "details": f"Decision notification sent to {applicant_email}"
+            }
+            app.decision_history = app.decision_history + [email_entry]
+            flag_modified(app, "decision_history")
+            
+            # Create audit log
+            log = AuditLog(
+                user=request.reviewer_name,
+                action=f"Sent Email: {app.final_decision}",
+                details=f"Application {application_id} - Email sent to {applicant_email}",
+                application_id=application_id
+            )
+            session.add(log)
+        else:
+            app.email_status = "failed"
+            app.email_error = email_result.get("error")
+        
+        app.updated_at = datetime.utcnow()
+        session.add(app)
+        session.commit()
+        session.refresh(app)
+        
+        return {
+            "success": email_result["status"] == "sent",
+            "email_status": email_result["status"],
+            "recipient": applicant_email,
+            "error": email_result.get("error"),
+            "sent_at": app.email_sent_at.isoformat() if app.email_sent_at else None
         }
 
 
@@ -2356,6 +2668,8 @@ async def get_settings():
                 "max_loan_personal": policy.max_loan_personal,
                 "max_loan_housing": policy.max_loan_housing,
                 "max_loan_car": policy.max_loan_car,
+                "email_notification_mode": policy.email_notification_mode,
+                "smtp_enabled": policy.smtp_enabled,
                 "updated_at": policy.updated_at.isoformat(),
                 "updated_by": policy.updated_by
             },
@@ -2385,6 +2699,8 @@ class UpdateSettingsRequest(BaseModel):
     max_loan_personal: Optional[float] = None
     max_loan_housing: Optional[float] = None
     max_loan_car: Optional[float] = None
+    email_notification_mode: Optional[str] = None
+    smtp_enabled: Optional[bool] = None
     updated_by: str = "Admin"
 
 
@@ -2444,6 +2760,8 @@ async def update_settings(request: UpdateSettingsRequest):
                 "dsr_threshold": policy.dsr_threshold,
                 "min_savings_rate": policy.min_savings_rate,
                 "confidence_threshold": policy.confidence_threshold,
+                "email_notification_mode": policy.email_notification_mode,
+                "smtp_enabled": policy.smtp_enabled,
                 "updated_at": policy.updated_at.isoformat(),
                 "updated_by": policy.updated_by
             }

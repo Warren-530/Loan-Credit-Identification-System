@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { 
   Settings, Sliders, Database, FileDown, Trash2, 
-  Bot, Activity, Clock, Shield, AlertCircle, CheckCircle2, Download, User, LogOut
+  Bot, Activity, Clock, Shield, AlertCircle, CheckCircle2, Download, User, LogOut, Mail
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
@@ -26,6 +26,8 @@ interface PolicySettings {
   max_loan_personal: number
   max_loan_housing: number
   max_loan_car: number
+  email_notification_mode: string
+  smtp_enabled: boolean
   updated_at: string
   updated_by: string
 }
@@ -136,7 +138,13 @@ export default function SettingsPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/settings`)
       if (res.ok) {
         const data = await res.json()
-        setPolicy(data.policy)
+        // 确保email配置字段存在，如果不存在则使用默认值
+        const policyData = {
+          ...data.policy,
+          email_notification_mode: data.policy.email_notification_mode || 'manual',
+          smtp_enabled: data.policy.smtp_enabled ?? false
+        }
+        setPolicy(policyData)
         setAuditLogs(data.audit_logs || [])
       }
     } catch (error) {
@@ -170,6 +178,8 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...policy,
+          email_notification_mode: policy.email_notification_mode || 'manual',
+          smtp_enabled: policy.smtp_enabled || false,
           updated_by: 'Admin Officer'
         })
       })
@@ -974,6 +984,124 @@ export default function SettingsPage() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* 6.5. Email Notification Settings */}
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-indigo-600" />
+                <CardTitle className="text-lg font-semibold text-slate-900">Email Notification Settings</CardTitle>
+              </div>
+              <CardDescription className="text-xs text-slate-500">
+                Configure applicant decision notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-5">
+              {/* Notification Mode Selection */}
+              <div>
+                <Label className="text-sm font-semibold mb-3 block">Notification Mode</Label>
+                <div className="space-y-3">
+                  <div className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    policy?.email_notification_mode === 'auto' 
+                      ? 'border-indigo-500 bg-indigo-50' 
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                    onClick={() => setPolicy(prev => prev ? {...prev, email_notification_mode: 'auto'} : null)}
+                  >
+                    <input 
+                      type="radio" 
+                      name="email-mode" 
+                      value="auto"
+                      checked={policy?.email_notification_mode === 'auto'}
+                      onChange={() => setPolicy(prev => prev ? {...prev, email_notification_mode: 'auto'} : null)}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <Label className="font-semibold cursor-pointer">Automatic</Label>
+                      <p className="text-xs text-slate-600 mt-1">Email sent immediately when decision is locked</p>
+                    </div>
+                    <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">Recommended</Badge>
+                  </div>
+                  
+                  <div className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    policy?.email_notification_mode === 'manual' 
+                      ? 'border-indigo-500 bg-indigo-50' 
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                    onClick={() => setPolicy(prev => prev ? {...prev, email_notification_mode: 'manual'} : null)}
+                  >
+                    <input 
+                      type="radio" 
+                      name="email-mode" 
+                      value="manual"
+                      checked={policy?.email_notification_mode === 'manual'}
+                      onChange={() => setPolicy(prev => prev ? {...prev, email_notification_mode: 'manual'} : null)}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <Label className="font-semibold cursor-pointer">Manual</Label>
+                      <p className="text-xs text-slate-600 mt-1">Officer clicks "Send Email" button to send</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* SMTP Enable/Disable */}
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <div className="flex-1">
+                  <Label className="font-semibold">Enable Email Notifications</Label>
+                  <p className="text-xs text-slate-600 mt-1">
+                    SMTP must be configured in backend/.env
+                  </p>
+                </div>
+                <Switch 
+                  checked={policy?.smtp_enabled || false}
+                  onCheckedChange={(checked) => setPolicy(prev => prev ? {...prev, smtp_enabled: checked} : null)}
+                />
+              </div>
+
+              {policy?.smtp_enabled && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-semibold">SMTP Configuration Active</p>
+                    <p className="mt-1">smtp.gmail.com:587 • Credentials in backend/.env</p>
+                    <p className="mt-1">Emails include comprehensive PDF assessment reports</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Email Templates Preview */}
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">Email Templates</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                    <span className="font-semibold text-green-900">Approval:</span>
+                    <span className="text-green-700">Professional template with loan details & PDF report</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                    <AlertCircle className="h-3 w-3 text-red-600" />
+                    <span className="font-semibold text-red-900">Rejection:</span>
+                    <span className="text-red-700">Polite template with recommendations & PDF report</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Failure Retry Info */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-900">
+                    <p className="font-semibold">Retry on Failure</p>
+                    <p className="mt-1">If email fails, a notification will appear with option to retry sending</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
