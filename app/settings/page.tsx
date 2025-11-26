@@ -358,7 +358,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8 p-8 pb-16 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
+    <div className="space-y-6 p-8 pb-16 max-w-[1200px] mx-auto bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -373,9 +373,9 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Risk Policy & AI Config */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="space-y-6">
+        {/* Single Column Layout - All Cards Stacked */}
+        <div className="space-y-6">
           {/* 1. Risk Policy Configuration - FULLY FUNCTIONAL (saves to database) */}
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 pb-4">
@@ -706,30 +706,10 @@ export default function SettingsPage() {
                 <Activity className="h-4 w-4 mr-2" />
                 Simulate Impact
               </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {saving ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Save Settings
-                  </>
-                )}
-              </Button>
             </div>
           </div>
-        </div>
 
-        {/* Right Column - Data Management & Logs */}
-        <div className="space-y-6">
-          {/* 3. Database Statistics */}
+          {/* Database Statistics */}
           {dbStats && (
             <Card className="bg-white border-slate-200 shadow-sm">
               <CardHeader className="border-b border-slate-100 pb-4">

@@ -1,0 +1,32 @@
+# InsightLoan Project Dependencies
+# Python 3.10+ required
+
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+
+# Data Validation & Models
+pydantic==2.9.2
+sqlmodel==0.0.22
+
+# PDF Processing
+pymupdf==1.24.13
+
+# AI & Vector Database
+chromadb==0.5.18
+google-generativeai==0.8.5
+
+# OCR & Image Processing
+pytesseract==0.3.10
+Pillow==10.4.0
+pypdfium2==4.30.0
+
+# Report Generation
+reportlab==4.4.5
+
+# Configuration
+python-dotenv==1.0.1
+
+# Note: Frontend dependencies are managed by npm/package.json
+# Run 'npm install' in the project root directory for frontend setup

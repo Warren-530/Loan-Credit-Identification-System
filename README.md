@@ -17,57 +17,59 @@ An enterprise-grade AI-powered credit risk assessment platform for Malaysian ban
 - **Python** 3.10+
 - **Google Gemini API Key** (free tier available)
 
-## 🛠️ Installation
+## Quick Start
 
-### 1. Frontend Setup (Next.js)
-```bash
-npm install
+### Automated Setup (Recommended)
+
+Run the automated setup script:
+
+```cmd
+QUICK_START.bat
 ```
 
-### 2. Backend Setup (FastAPI)
-```bash
-cd backend
-python -m venv venv
+This will automatically install all dependencies and start both servers.
 
-# On Windows
+### Manual Setup
+
+See [INSTALLATION.md](INSTALLATION.md) for detailed installation instructions.
+
+## Configuration
+
+Configuration files are required before running the application:
+
+- `.env.local` - Frontend configuration (Firebase, API endpoint)
+- `backend/.env` - Backend configuration (Gemini API, Email SMTP)
+
+Run the verification script to check your configuration:
+
+```powershell
+python verify_config.py
+```
+
+For detailed configuration steps, see [CONFIG_CHECKLIST.md](CONFIG_CHECKLIST.md).
+
+## Running the Application
+
+### Option 1: Quick Start Script
+```cmd
+START_SERVERS.bat
+```
+
+### Option 2: Manual Start
+
+Terminal 1 (Backend):
+```powershell
+cd backend
 venv\Scripts\activate
-
-# On macOS/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 3. Configuration
-
-Create `backend/.env` from the example:
-```bash
-cp backend/.env.example backend/.env
-```
-
-Edit `backend/.env` and add your Gemini API key:
-```
-GEMINI_API_KEY=your_actual_api_key_here
-```
-
-**Get a free Gemini API key**: https://makersuite.google.com/app/apikey
-
-## 🚀 Running the Application
-
-### Start Backend (Terminal 1)
-```bash
-cd backend
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
-python main.py
-```
-Backend will run on **http://localhost:8000**
-
-### Start Frontend (Terminal 2)
-```bash
+Terminal 2 (Frontend):
+```powershell
 npm run dev
 ```
-Frontend will run on **http://localhost:3000**
+
+Access the application at **http://localhost:3000**
 
 ## 📖 Usage
 
@@ -146,6 +148,18 @@ The AI is configured with Malaysian-specific financial context:
 - Bank credit officers
 - Desktop monitors
 - Enterprise SaaS aesthetics
+
+## Documentation
+
+- [INSTALLATION.md](INSTALLATION.md) - Complete installation guide with troubleshooting
+- [SCRIPTS.md](SCRIPTS.md) - Reference for all available scripts and their usage
+- [CONFIG_CHECKLIST.md](CONFIG_CHECKLIST.md) - Configuration verification checklist
+
+## Troubleshooting
+
+See [INSTALLATION.md](INSTALLATION.md#troubleshooting) for common issues and solutions.
+
+For script-specific help, see [SCRIPTS.md](SCRIPTS.md#script-troubleshooting).
 
 ---
 
