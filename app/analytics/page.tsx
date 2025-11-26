@@ -3,14 +3,45 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Slider } from "@/components/ui/slider"
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend 
+  PieChart, Pie, Cell, Legend, ScatterChart, Scatter, ReferenceLine, ZAxis, Label,
+  LineChart, Line, Area, AreaChart, ComposedChart
 } from "recharts"
 import { 
   TrendingUp, TrendingDown, DollarSign, Activity, Clock, 
-  CheckCircle2, AlertTriangle, ShieldAlert, Users, FileCheck
+  CheckCircle2, AlertTriangle, ShieldAlert, Users, FileCheck, Calendar, Zap
 } from "lucide-react"
+
+interface ScatterPoint {
+  income: number
+  dsr: number
+  status: string
+  name: string
+  id: string
+}
+
+interface TrendData {
+  date: string
+  total: number
+  approved: number
+  rejected: number
+  approval_rate: number
+}
+
+interface RiskBreakdown {
+  risk_level: string
+  approved: number
+  rejected: number
+  pending: number
+  approval_rate: number
+}
+
+interface RiskAnalysis {
+  breakdown: RiskBreakdown[]
+  processing_time: { range: string; count: number }[]
+}
 
 interface AnalyticsData {
   kpi: {
@@ -35,6 +66,11 @@ interface AnalyticsData {
     reason: string
     date: string
   }[]
+  advanced: {
+    financial_scatter: ScatterPoint[]
+    application_trends: TrendData[]
+    risk_level_analysis: RiskAnalysis
+  }
 }
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
@@ -58,6 +94,10 @@ export default function AnalyticsPage() {
       }
     }
     fetchAnalytics()
+    
+    // Auto-refresh every 30 seconds for real-time updates
+    const interval = setInterval(fetchAnalytics, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   if (loading) {
@@ -83,9 +123,9 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6 p-8 max-w-[1800px] mx-auto bg-slate-50 min-h-screen">
+    <div className="space-y-8 p-8 pb-16 max-w-[1800px] mx-auto bg-slate-50 min-h-screen">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Portfolio Analytics</h1>
           <p className="text-sm text-slate-500 mt-1">Comprehensive risk monitoring and operational insights</p>
@@ -98,7 +138,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPI Cards - Top Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
         {/* Total Applications */}
         <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5">
@@ -201,7 +241,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts - Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
         {/* Risk Score Distribution */}
         <Card className="lg:col-span-2 bg-white border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-100 pb-4">
@@ -211,7 +251,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[320px] w-full">
+            <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.charts.score_distribution}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -258,7 +298,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[320px] w-full">
+            <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -296,7 +336,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts - Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
         {/* Application Status Breakdown */}
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-100 pb-4">
@@ -306,7 +346,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-[280px] w-full">
+            <div className="h-[320px] w-full">
               {data.charts.status_breakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.charts.status_breakdown} layout="vertical">
@@ -362,7 +402,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="space-y-4">
+            <div className="space-y-5">
               {data.charts.top_risk_flags.length > 0 ? (
                 data.charts.top_risk_flags.map((flag, idx) => {
                   const percentage = (flag.count / data.kpi.total_applications) * 100
@@ -400,7 +440,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Human Override Monitor */}
-      <Card className="bg-white border-slate-200 shadow-sm">
+      <Card className="bg-white border-slate-200 shadow-sm mt-2">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-amber-500" />
@@ -451,6 +491,268 @@ export default function AnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ADVANCED ANALYTICS SECTION */}
+      <div className="pt-8 mt-8 border-t-2 border-slate-200">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Advanced Risk Intelligence</h2>
+        <p className="text-sm text-slate-500 mb-8">Multi-dimensional analysis and predictive insights</p>
+      </div>
+
+      {/* 1. Financial Health Scatter Plot */}
+      {data.advanced?.financial_scatter && data.advanced.financial_scatter.length > 0 && (
+        <Card className="bg-white border-slate-200 shadow-sm">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900">Financial Health Landscape</CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Income vs Debt Service Ratio correlation analysis with risk clustering visualization
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="h-[480px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis 
+                    type="number" 
+                    dataKey="income" 
+                    name="Monthly Income" 
+                    unit=" RM"
+                    fontSize={11}
+                    tickLine={false}
+                    tick={{ fill: '#64748b' }}
+                    label={{ value: 'Net Monthly Income (RM)', position: 'insideBottom', offset: -10, fontSize: 12, fill: '#475569' }}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="dsr" 
+                    name="DSR" 
+                    unit="%"
+                    fontSize={11}
+                    tickLine={false}
+                    tick={{ fill: '#64748b' }}
+                    label={{ value: 'Debt Service Ratio (%)', angle: -90, position: 'insideLeft', fontSize: 12, fill: '#475569' }}
+                  />
+                  <ZAxis range={[60, 200]} />
+                  <Tooltip 
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload[0]) {
+                        const data = payload[0].payload
+                        return (
+                          <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
+                            <p className="font-semibold text-slate-900 text-xs mb-1">{data.name}</p>
+                            <p className="text-xs text-slate-600">Income: RM {data.income.toLocaleString()}</p>
+                            <p className="text-xs text-slate-600">DSR: {data.dsr.toFixed(1)}%</p>
+                            <p className="text-xs">
+                              <Badge className={
+                                data.status === 'Approved' ? 'bg-emerald-500' :
+                                data.status === 'Rejected' ? 'bg-rose-500' : 'bg-amber-500'
+                              }>
+                                {data.status}
+                              </Badge>
+                            </p>
+                          </div>
+                        )
+                      }
+                      return null
+                    }}
+                  />
+                  <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2}>
+                    <Label value="High Risk Threshold (DSR 60%)" position="right" fill="#ef4444" fontSize={11} />
+                  </ReferenceLine>
+                  <Scatter 
+                    name="Approved" 
+                    data={data.advanced.financial_scatter.filter(d => d.status === 'Approved')} 
+                    fill="#10b981"
+                    opacity={0.7}
+                  />
+                  <Scatter 
+                    name="Rejected" 
+                    data={data.advanced.financial_scatter.filter(d => d.status === 'Rejected')} 
+                    fill="#ef4444"
+                    opacity={0.7}
+                  />
+                  <Scatter 
+                    name="Pending" 
+                    data={data.advanced.financial_scatter.filter(d => d.status === 'Pending' || (!['Approved', 'Rejected'].includes(d.status)))} 
+                    fill="#f59e0b"
+                    opacity={0.7}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }}
+                    iconType="circle"
+                    verticalAlign="bottom"
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-6 p-5 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-slate-700 leading-relaxed">
+                <strong>Insight:</strong> Applications clustered in the top-left quadrant (low income, high DSR) represent the highest risk segment. 
+                The reference line at 60% DSR marks the critical threshold - data points above this line require enhanced scrutiny.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Application Trends & Risk Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        {/* 2. Application Trends Over Time */}
+        {data.advanced?.application_trends && data.advanced.application_trends.length > 0 && (
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-lg font-semibold text-slate-900">Application Trends Over Time</CardTitle>
+              </div>
+              <CardDescription className="text-xs text-slate-500">
+                Daily submission volume and approval rate patterns
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="h-[360px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={data.advanced.application_trends}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis 
+                      dataKey="date" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tick={{ fill: '#64748b' }}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tick={{ fill: '#64748b' }}
+                      label={{ value: 'Applications', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#64748b' } }}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tick={{ fill: '#64748b' }}
+                      domain={[0, 100]}
+                      label={{ value: 'Approval %', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: '#64748b' } }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                        fontSize: '11px'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Bar yAxisId="left" dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Total Apps" />
+                    <Bar yAxisId="left" dataKey="approved" fill="#10b981" radius={[4, 4, 0, 0]} name="Approved" />
+                    <Bar yAxisId="left" dataKey="rejected" fill="#ef4444" radius={[4, 4, 0, 0]} name="Rejected" />
+                    <Line 
+                      yAxisId="right" 
+                      type="monotone" 
+                      dataKey="approval_rate" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      name="Approval Rate %"
+                      dot={{ fill: '#f59e0b', r: 4 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 3. Risk Level Analysis */}
+        {data.advanced?.risk_level_analysis && (
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-lg font-semibold text-slate-900">Risk Level Analysis</CardTitle>
+              </div>
+              <CardDescription className="text-xs text-slate-500">
+                Approval patterns by risk tier and processing time distribution
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="space-y-8">
+                {/* Risk Level Breakdown */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-4">Decision Breakdown by Risk Tier</h4>
+                  <div className="h-[210px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data.advanced.risk_level_analysis.breakdown} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                        <XAxis type="number" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
+                        <YAxis 
+                          type="category" 
+                          dataKey="risk_level" 
+                          fontSize={10} 
+                          tickLine={false} 
+                          axisLine={false}
+                          tick={{ fill: '#64748b' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '8px', 
+                            border: 'none', 
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            fontSize: '11px'
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '11px' }} />
+                        <Bar dataKey="approved" stackId="a" fill="#10b981" name="Approved" />
+                        <Bar dataKey="rejected" stackId="a" fill="#ef4444" name="Rejected" />
+                        <Bar dataKey="pending" stackId="a" fill="#64748b" name="Pending" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Processing Time Distribution */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-4">Processing Time Distribution</h4>
+                  <div className="h-[210px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data.advanced.risk_level_analysis.processing_time}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="range" 
+                          fontSize={10} 
+                          tickLine={false} 
+                          axisLine={false}
+                          tick={{ fill: '#64748b' }}
+                        />
+                        <YAxis 
+                          fontSize={10} 
+                          tickLine={false} 
+                          axisLine={false}
+                          tick={{ fill: '#64748b' }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '8px', 
+                            border: 'none', 
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                            fontSize: '11px'
+                          }}
+                        />
+                        <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Applications" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

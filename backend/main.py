@@ -138,7 +138,15 @@ async def get_analytics_summary():
                     "top_risk_flags": [],
                     "status_breakdown": []
                 },
-                "overrides": []
+                "overrides": [],
+                "advanced": {
+                    "financial_scatter": [],
+                    "application_trends": [],
+                    "risk_level_analysis": {
+                        "breakdown": [],
+                        "processing_time": []
+                    }
+                }
             }
         
         # KPI Calculations
@@ -223,6 +231,112 @@ async def get_analytics_summary():
                     "date": a.reviewed_at.strftime("%Y-%m-%d") if a.reviewed_at else a.updated_at.strftime("%Y-%m-%d")
                 })
         
+        # === ADVANCED ANALYTICS ===
+        
+        # 1. Financial Health Scatter Data (Income vs DSR)
+        scatter_data = []
+        for a in apps:
+            if a.analysis_result and "financial_metrics" in a.analysis_result:
+                metrics = a.analysis_result["financial_metrics"]
+                
+                # Extract income (handle nested structure)
+                income = 0
+                if "net_disposable_income" in metrics:
+                    ndi = metrics["net_disposable_income"]
+                    income = ndi.get("calculation", {}).get("net_income", 0)
+                
+                # Extract DSR (handle nested structure)
+                dsr = 0
+                if "debt_service_ratio" in metrics:
+                    dsr_data = metrics["debt_service_ratio"]
+                    dsr = dsr_data.get("value", 0)
+                
+                if income > 0 and dsr > 0:
+                    scatter_data.append({
+                        "income": income,
+                        "dsr": dsr,
+                        "status": a.final_decision or "Pending",
+                        "name": a.applicant_name or "Unknown",
+                        "id": a.application_id
+                    })
+        
+        # 2. Application Trends Over Time
+        from collections import defaultdict
+        date_stats = defaultdict(lambda: {"total": 0, "approved": 0, "rejected": 0})
+        
+        for a in apps:
+            date_key = a.created_at.strftime("%Y-%m-%d") if a.created_at else "Unknown"
+            date_stats[date_key]["total"] += 1
+            if a.final_decision == "Approved":
+                date_stats[date_key]["approved"] += 1
+            elif a.final_decision == "Rejected":
+                date_stats[date_key]["rejected"] += 1
+        
+        trend_data = [
+            {
+                "date": date,
+                "total": stats["total"],
+                "approved": stats["approved"],
+                "rejected": stats["rejected"],
+                "approval_rate": round((stats["approved"] / stats["total"] * 100), 1) if stats["total"] > 0 else 0
+            }
+            for date, stats in sorted(date_stats.items())
+        ]
+        
+        # 3. Risk Level Deep Dive
+        risk_analysis = {}
+        for risk_level in ["Low", "Medium", "High"]:
+            risk_apps = [a for a in apps if a.risk_level and a.risk_level.value == risk_level]
+            total_risk = len(risk_apps)
+            
+            if total_risk > 0:
+                approved_risk = len([a for a in risk_apps if a.final_decision == "Approved"])
+                rejected_risk = len([a for a in risk_apps if a.final_decision == "Rejected"])
+                pending_risk = total_risk - approved_risk - rejected_risk
+                
+                risk_analysis[risk_level] = {
+                    "total": total_risk,
+                    "approved": approved_risk,
+                    "rejected": rejected_risk,
+                    "pending": pending_risk,
+                    "approval_rate": round((approved_risk / total_risk * 100), 1)
+                }
+        
+        risk_breakdown = [
+            {
+                "risk_level": level,
+                "approved": data["approved"],
+                "rejected": data["rejected"],
+                "pending": data["pending"],
+                "approval_rate": data["approval_rate"]
+            }
+            for level, data in risk_analysis.items()
+        ]
+        
+        # Processing Time Analysis
+        time_ranges = {
+            "< 30s": 0,
+            "30-45s": 0,
+            "45-60s": 0,
+            "> 60s": 0
+        }
+        
+        for a in apps:
+            if a.processing_time:
+                if a.processing_time < 30:
+                    time_ranges["< 30s"] += 1
+                elif a.processing_time < 45:
+                    time_ranges["30-45s"] += 1
+                elif a.processing_time < 60:
+                    time_ranges["45-60s"] += 1
+                else:
+                    time_ranges["> 60s"] += 1
+        
+        processing_distribution = [
+            {"range": k, "count": v}
+            for k, v in time_ranges.items()
+        ]
+        
         return {
             "kpi": {
                 "total_applications": total,
@@ -238,7 +352,15 @@ async def get_analytics_summary():
                 "top_risk_flags": top_risk_flags,
                 "status_breakdown": status_chart
             },
-            "overrides": sorted(overrides, key=lambda x: x["date"], reverse=True)[:5]
+            "overrides": sorted(overrides, key=lambda x: x["date"], reverse=True)[:5],
+            "advanced": {
+                "financial_scatter": scatter_data,
+                "application_trends": trend_data,
+                "risk_level_analysis": {
+                    "breakdown": risk_breakdown,
+                    "processing_time": processing_distribution
+                }
+            }
         }
 
 
