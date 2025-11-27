@@ -32,15 +32,14 @@ class AIEngine:
             essay_text: Extracted essay text
             payslip_text: Extracted payslip text (may be empty for Micro-Business)
             application_id: Unique application ID for context isolation
-            application_form_path: Path to Application Form PDF (for Vision analysis)
+            application_form_path: Path to Application Form PDF (DEPRECATED - no longer used for Vision)
             supporting_docs_texts: List of extracted texts from supporting documents
             
         Returns:
             Analysis result as dictionary with applicant_profile and document_texts attached
         """
-        if application_form_path:
-            print(f"[AI ENGINE] Switching to Vision Analysis for {application_id}")
-            return self.analyze_application_with_vision(application_form_path, bank_text, essay_text, payslip_text, application_id, supporting_docs_texts)
+        # NOTE: Vision analysis disabled - all documents now use text extraction
+        # The application_form_path parameter is kept for backward compatibility but ignored
 
         try:
             # Build the prompt with XML structure for clear document boundaries
