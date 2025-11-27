@@ -4,7 +4,7 @@ FastAPI Backend for TrustLens AI
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Optional, List
@@ -538,6 +538,96 @@ async def get_status(application_id: str):
             "final_decision": app_obj.final_decision or app_obj.ai_decision or "Pending",
             "review_status": app_obj.review_status.value if app_obj.review_status else None,
         }
+
+
+@app.get("/api/application/{application_id}/analyze-stream")
+async def analyze_stream(application_id: str):
+    """
+    Server-Sent Events (SSE) endpoint for streaming AI analysis.
+    Provides real-time feedback as the AI generates the analysis.
+    """
+    if not ai_engine:
+        raise HTTPException(status_code=503, detail="AI Engine not available")
+    
+    # Get application data
+    with get_session() as session:
+        app_obj = session.query(Application).filter(Application.application_id == application_id).first()
+        if not app_obj:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Get stored document texts from analysis_result if available
+        analysis = app_obj.analysis_result or {}
+        doc_texts = analysis.get('document_texts', {})
+        
+        application_form_text = doc_texts.get('application_form', '')
+        bank_text = doc_texts.get('bank_statement', '')
+        essay_text = doc_texts.get('essay', '')
+        payslip_text = doc_texts.get('payslip', '')
+        supporting_docs_texts = doc_texts.get('supporting_docs', [])
+    
+    async def generate_sse():
+        """Generator function for SSE stream"""
+        try:
+            # Send initial event
+            yield f"data: {{\"status\": \"started\", \"message\": \"AI analysis starting...\"}}\n\n"
+            
+            # Run streaming analysis in thread pool
+            accumulated_json = ""
+            chunk_count = 0
+            
+            def run_streaming():
+                return list(ai_engine.analyze_application_streaming(
+                    application_form_text=application_form_text,
+                    raw_text="",
+                    bank_text=bank_text,
+                    essay_text=essay_text,
+                    payslip_text=payslip_text,
+                    application_id=application_id,
+                    supporting_docs_texts=supporting_docs_texts
+                ))
+            
+            chunks = await run_in_threadpool(run_streaming)
+            
+            for chunk in chunks:
+                accumulated_json += chunk
+                chunk_count += 1
+                # Send progress update every few chunks
+                if chunk_count % 5 == 0:
+                    yield f"data: {{\"status\": \"streaming\", \"chunks\": {chunk_count}, \"length\": {len(accumulated_json)}}}\n\n"
+            
+            # Parse the complete JSON
+            import json
+            import re
+            
+            result_text = accumulated_json.strip()
+            result_text = re.sub(r'^```json\s*', '', result_text)
+            result_text = re.sub(r'\s*```$', '', result_text)
+            
+            try:
+                result = json.loads(result_text)
+                # Send completed event with result
+                yield f"data: {{\"status\": \"completed\", \"result\": {json.dumps(result)}}}\n\n"
+            except json.JSONDecodeError as e:
+                yield f"data: {{\"status\": \"error\", \"message\": \"JSON parse error: {str(e)}\"}}\n\n"
+            
+            yield "data: [DONE]\n\n"
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"data: {{\"status\": \"error\", \"message\": \"{str(e)}\"}}\n\n"
+            yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        generate_sse(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 
 @app.get("/api/debug/risk-flags/{application_id}")
 async def debug_risk_flags(application_id: str):

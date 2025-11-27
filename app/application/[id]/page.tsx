@@ -40,6 +40,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
   const [showPdf, setShowPdf] = useState(false)
   const [searchTerm, setSearchTerm] = useState<string>("")
   const [isPolling, setIsPolling] = useState(false)
+  const [streamingProgress, setStreamingProgress] = useState<{ chunks: number; length: number; message: string } | null>(null)
   
   // Resizable Split View State
   const [leftPanelWidth, setLeftPanelWidth] = useState(50) // percentage
@@ -103,28 +104,67 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
     void loadApplication()
   }, [resolvedParams.id, navigateApplication])
 
-  // Status polling while processing/analyzing
+  // Status polling while processing/analyzing with streaming progress
   useEffect(() => {
     if (!appData) return
     if (['Processing','Analyzing'].includes(String(appData.status))) {
       setIsPolling(true)
+      setStreamingProgress({ chunks: 0, length: 0, message: 'Connecting to AI...' })
+      
+      // Subscribe to streaming updates for real-time progress
+      const unsubscribe = api.subscribeToAnalysis(
+        resolvedParams.id,
+        // onProgress
+        (data) => {
+          setStreamingProgress({
+            chunks: data.chunks || 0,
+            length: data.length || 0,
+            message: data.message || `Analyzing... ${data.chunks || 0} chunks received`
+          })
+        },
+        // onComplete - refresh the full application data
+        async () => {
+          setStreamingProgress({ chunks: 0, length: 0, message: 'Analysis complete! Loading results...' })
+          try {
+            const updated = await api.getApplication(resolvedParams.id)
+            setAppData(updated)
+            setIsPolling(false)
+            setStreamingProgress(null)
+          } catch (e) {
+            console.error('Failed to load updated data:', e)
+          }
+        },
+        // onError
+        (error) => {
+          console.error('Streaming error:', error)
+          setStreamingProgress({ chunks: 0, length: 0, message: `Error: ${error}` })
+        }
+      )
+      
+      // Also keep polling as backup
       const interval = setInterval(async () => {
         try {
           const updated = await api.getApplication(resolvedParams.id)
           setAppData(updated)
           if (!['Processing','Analyzing'].includes(String(updated.status))) {
             setIsPolling(false)
+            setStreamingProgress(null)
             clearInterval(interval)
           }
         } catch (e) {
           console.error('Polling failed:', e)
         }
-      }, 3000)
-      return () => clearInterval(interval)
+      }, 5000) // Slower polling since we have streaming
+      
+      return () => {
+        clearInterval(interval)
+        unsubscribe()
+      }
     } else {
       setIsPolling(false)
+      setStreamingProgress(null)
     }
-  }, [appData, resolvedParams.id])
+  }, [appData?.status, resolvedParams.id])
   
   // Keyboard navigation
   useEffect(() => {
@@ -898,9 +938,21 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   </div>
                   <p className="text-xs text-slate-600 font-semibold mt-1 uppercase tracking-wide">Credit Score</p>
                   {isPolling && (
-                    <div className="mt-2 flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
-                      <span className="text-xs text-indigo-600 font-semibold">Analyzing...</span>
+                    <div className="mt-2 flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <div className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                        <span className="text-xs text-indigo-600 font-semibold">
+                          {streamingProgress?.message || 'Analyzing...'}
+                        </span>
+                      </div>
+                      {streamingProgress && streamingProgress.chunks > 0 && (
+                        <div className="w-full bg-indigo-100 rounded-full h-1.5 mt-1">
+                          <div 
+                            className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min((streamingProgress.length / 5000) * 100, 100)}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

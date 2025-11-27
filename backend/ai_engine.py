@@ -549,3 +549,50 @@ class AIEngine:
             # Don't fail the whole process, just keep AI values if calculation fails
             
         return result
+
+    def analyze_application_streaming(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "", supporting_docs_texts: list[str] = []):
+        """
+        Streaming version of analyze_application - yields chunks of text as they're generated.
+        This provides faster perceived response time for the user.
+        
+        Yields:
+            str: Chunks of JSON response text as they are generated
+        """
+        from prompts import build_prompt
+        
+        try:
+            print(f"[AI ENGINE STREAMING] Building prompt for {application_id}")
+            
+            prompt = build_prompt(
+                application_form_text=application_form_text,
+                payslip_text=payslip_text,
+                bank_statement_text=bank_text,
+                essay_text=essay_text,
+                application_id=application_id,
+                supporting_docs_texts=supporting_docs_texts
+            )
+            
+            print(f"[AI ENGINE STREAMING] Initializing Gemini model with streaming: {self.model_name}")
+            model = genai.GenerativeModel(
+                self.model_name,
+                generation_config={
+                    "response_mime_type": "application/json"
+                }
+            )
+            
+            # Use streaming response
+            response = model.generate_content(prompt, stream=True)
+            
+            accumulated_text = ""
+            for chunk in response:
+                if chunk.text:
+                    accumulated_text += chunk.text
+                    yield chunk.text
+            
+            print(f"[AI ENGINE STREAMING] Streaming complete, total length: {len(accumulated_text)}")
+            
+        except Exception as e:
+            print(f"[AI ENGINE STREAMING ERROR] {e}")
+            # Yield error as JSON
+            import json
+            yield json.dumps({"error": str(e)})

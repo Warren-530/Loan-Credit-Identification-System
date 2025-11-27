@@ -131,4 +131,51 @@ export const api = {
     if (!response.ok) throw new Error('Failed to toggle highlight');
     return response.json();
   },
+
+  /**
+   * Subscribe to streaming AI analysis updates via Server-Sent Events
+   * @param applicationId - The application ID to analyze
+   * @param onProgress - Callback for progress updates
+   * @param onComplete - Callback when analysis is complete
+   * @param onError - Callback for errors
+   * @returns A function to close the connection
+   */
+  subscribeToAnalysis(
+    applicationId: string,
+    onProgress: (data: { status: string; chunks?: number; length?: number; message?: string }) => void,
+    onComplete: (result: Record<string, unknown>) => void,
+    onError: (error: string) => void
+  ): () => void {
+    const eventSource = new EventSource(`${API_BASE_URL}/api/application/${applicationId}/analyze-stream`);
+    
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        eventSource.close();
+        return;
+      }
+      
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.status === 'completed' && data.result) {
+          onComplete(data.result);
+        } else if (data.status === 'error') {
+          onError(data.message || 'Unknown error');
+        } else {
+          onProgress(data);
+        }
+      } catch (e) {
+        console.error('Failed to parse SSE data:', e);
+      }
+    };
+    
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error);
+      onError('Connection lost');
+      eventSource.close();
+    };
+    
+    // Return cleanup function
+    return () => eventSource.close();
+  },
 };
