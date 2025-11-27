@@ -873,7 +873,7 @@ async def process_application_background(
         
         # Auto-generate decision based on risk score if not provided
         if final_decision is None and risk_score is not None:
-            if risk_score >= 70:
+            if risk_score >= 80:
                 final_decision = "Approved"
             elif risk_score >= 50:
                 final_decision = "Review Required"
