@@ -1222,7 +1222,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                     <span className="text-4xl font-black text-white drop-shadow">{riskScore}/100</span>
                   </div>
                   <p className="text-xs text-slate-400 mt-3 bg-slate-700/50 rounded-lg p-2">
-                    📊 Score Guide: 80-100 = Low Risk (Approve), 60-79 = Medium Risk (Review), 0-59 = High Risk (Reject)
+                    Score Guide: 80-100 = Low Risk (Approve), 60-79 = Medium Risk (Review), 0-59 = High Risk (Reject)
                   </p>
                 </div>
               </div>
