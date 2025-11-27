@@ -879,20 +879,20 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               {/* Decision & Risk Level Badges */}
               <div className="flex items-center gap-3 mt-3 ml-12">
                 {/* Large Risk Score Display */}
-                <div className={`px-5 py-3 rounded-xl border-2 ${
-                  riskScore >= 80 ? 'bg-emerald-50 border-emerald-200' :
-                  riskScore >= 60 ? 'bg-amber-50 border-amber-200' :
-                  'bg-rose-50 border-rose-200'
+                <div className={`px-6 py-4 rounded-2xl border-2 shadow-lg ${
+                  riskScore >= 80 ? 'bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-300' :
+                  riskScore >= 60 ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-300' :
+                  'bg-gradient-to-br from-rose-50 to-red-100 border-rose-300'
                 }`}>
                   <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl font-bold tabular-nums tracking-tight ${
+                    <span className={`text-5xl font-black tabular-nums tracking-tight drop-shadow-sm ${
                       riskScore >= 80 ? 'text-emerald-600' :
                       riskScore >= 60 ? 'text-amber-600' :
                       'text-rose-600'
                     }`}>
                       {riskScore}
                     </span>
-                    <span className="text-sm text-slate-500 font-semibold">/100</span>
+                    <span className="text-sm text-slate-600 font-bold">/100</span>
                   </div>
                   <p className="text-xs text-slate-600 font-semibold mt-1 uppercase tracking-wide">Credit Score</p>
                   {isPolling && (
@@ -1076,7 +1076,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Applicant Information Card - Moved to Top */}
         {analysis?.applicant_profile && (
-          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 shadow-sm">
+          <Card className="bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 border-indigo-200/60 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1177,7 +1177,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Risk Score Breakdown - Show Calculation Transparency */}
         {scoreBreakdown && scoreBreakdown.length > 0 && (
-          <Card className="bg-gradient-to-br from-slate-50 to-gray-50 border-slate-300 shadow-sm">
+          <Card className="bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-50 border-slate-200 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="text-slate-900 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-slate-600" />
@@ -1193,10 +1193,10 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   const pointsDisplay = item.points > 0 ? `+${item.points}` : item.points
                   
                   return (
-                    <div key={idx} className={`flex items-start justify-between p-3 rounded-lg border-2 ${
-                      isPositive ? 'bg-emerald-50 border-emerald-200' :
-                      isNegative ? 'bg-rose-50 border-rose-200' :
-                      'bg-slate-50 border-slate-200'
+                    <div key={idx} className={`flex items-start justify-between p-4 rounded-xl border-2 shadow-sm hover:shadow-md transition-all ${
+                      isPositive ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 hover:border-emerald-300' :
+                      isNegative ? 'bg-gradient-to-r from-rose-50 to-red-50 border-rose-200 hover:border-rose-300' :
+                      'bg-gradient-to-r from-slate-50 to-gray-50 border-slate-200 hover:border-slate-300'
                     }`}>
                       <div className="flex-1">
                         <h4 className="text-sm font-bold text-slate-900">{item.category}</h4>
@@ -1216,13 +1216,13 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
                   )
                 })}
                 
-                <div className="mt-4 p-3 bg-slate-800 rounded-lg">
+                <div className="mt-4 p-4 bg-gradient-to-r from-slate-800 via-slate-900 to-zinc-800 rounded-xl shadow-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-white">TOTAL CREDIT SCORE</span>
-                    <span className="text-3xl font-bold text-white">{riskScore}/100</span>
+                    <span className="text-sm font-bold text-slate-200 uppercase tracking-wide">Total Credit Score</span>
+                    <span className="text-4xl font-black text-white drop-shadow">{riskScore}/100</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Score Interpretation: 80-100 = Low Risk (Approve), 60-79 = Medium Risk (Review), 0-59 = High Risk (Reject)
+                  <p className="text-xs text-slate-400 mt-3 bg-slate-700/50 rounded-lg p-2">
+                    📊 Score Guide: 80-100 = Low Risk (Approve), 60-79 = Medium Risk (Review), 0-59 = High Risk (Reject)
                   </p>
                 </div>
               </div>
@@ -1232,12 +1232,12 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Decision Justification Section - NEW */}
         {analysis?.decision_justification && (
-          <Card className={`border-2 shadow-lg ${
+          <Card className={`border-2 shadow-lg hover:shadow-xl transition-shadow ${
             analysis.decision_justification.recommendation === 'APPROVE' 
-              ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-300' 
+              ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 border-emerald-300' 
               : analysis.decision_justification.recommendation === 'REVIEW'
-              ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300'
-              : 'bg-gradient-to-br from-rose-50 to-red-50 border-rose-300'
+              ? 'bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 border-amber-300'
+              : 'bg-gradient-to-br from-rose-50 via-red-50 to-pink-50 border-rose-300'
           }`}>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1328,7 +1328,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Financial Metrics Section - Comprehensive Analysis */}
         {analysis && analysis.financial_metrics && Object.keys(analysis.financial_metrics).length > 0 && (
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 shadow-sm">
+          <Card className="bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 border-purple-200/60 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="text-slate-900 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-purple-600" />
@@ -1340,7 +1340,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-2 gap-4">
                 {/* Debt Service Ratio (DSR) */}
                 {analysis.financial_metrics.debt_service_ratio && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Debt Service Ratio (DSR)</h4>
                       <Badge className={`${
@@ -1375,7 +1375,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
                 {/* Net Disposable Income */}
                 {analysis.financial_metrics.net_disposable_income && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Net Disposable Income</h4>
                       <Badge className={`${
@@ -1410,7 +1410,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
                 {/* Per Capita Income */}
                 {analysis.financial_metrics.per_capita_income && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Per Capita Income</h4>
                       <Badge className={`${
@@ -1447,7 +1447,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
                 {/* Savings Rate */}
                 {analysis.financial_metrics.savings_rate && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Savings Rate</h4>
                       <Badge className={`${
@@ -1481,7 +1481,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
                 {/* Cost of Living Ratio */}
                 {analysis.financial_metrics.cost_of_living_ratio && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Cost of Living Ratio</h4>
                       <Badge className={`${
@@ -1515,7 +1515,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
                 {/* Loan-to-Value Ratio (for Car/Housing loans only) */}
                 {analysis.financial_metrics.loan_to_value_ratio?.applicable && (
-                  <div className="bg-white rounded-lg border border-purple-200 p-4">
+                  <div className="bg-white rounded-xl border border-purple-200/60 p-4 shadow-sm hover:shadow-md transition-all hover:border-purple-300">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-slate-900">Loan-to-Value Ratio (LTV)</h4>
                       <Badge className={`${
@@ -1544,7 +1544,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Metric Explanations */}
-              <div className="mt-4 p-4 bg-white/50 rounded-lg border border-purple-200">
+              <div className="mt-4 p-4 bg-gradient-to-r from-purple-50/70 to-violet-50/70 rounded-xl border border-purple-200/60">
                 <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase">Understanding Financial Metrics</h4>
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600">
                   <div>
@@ -1572,9 +1572,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         )}
 
         {/* Risk Factors (key_risk_flags only) */}
-        <Card>
+        <Card className="bg-gradient-to-br from-orange-50/50 via-amber-50/50 to-yellow-50/50 border-amber-200/60 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Risk Factors</CardTitle>
+            <CardTitle className="text-base text-amber-900">Risk Factors</CardTitle>
             <CardDescription className="text-xs">Explicit deductions & positive confirmations</CardDescription>
           </CardHeader>
           <CardContent>
@@ -1582,11 +1582,11 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               {riskFlags.map((rf, idx) => {
                 const isPositive = rf.severity === 'Positive'
                 const isNegative = rf.severity === 'High'
-                const bgColor = isNegative ? 'bg-rose-50 border-rose-200' : isPositive ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                const bgColor = isNegative ? 'bg-gradient-to-r from-rose-50 to-red-50 border-rose-200 hover:border-rose-300' : isPositive ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 hover:border-emerald-300' : 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200 hover:border-amber-300'
                 const IconComponent = isNegative ? AlertTriangle : isPositive ? CheckCircle : AlertCircle
                 const iconColor = isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-amber-600'
                 return (
-                  <div key={idx} className={`${bgColor} border rounded-lg p-3`}>
+                  <div key={idx} className={`${bgColor} border rounded-xl p-4 shadow-sm hover:shadow-md transition-all`}>
                     <div className="flex items-start gap-3">
                       <IconComponent className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
                       <div className="flex-1 min-w-0">
@@ -1609,8 +1609,8 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         </Card>
 
         {/* Forensic Analysis Table - Dynamic from API */}
-        <Card className="border-l-4 border-l-amber-500">
-          <CardHeader className="pb-3 bg-amber-50/50">
+        <Card className="border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50/30 to-orange-50/30 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3 bg-amber-50/70">
             <CardTitle className="text-base flex items-center">
               <Shield className="h-4 w-4 mr-2 text-amber-600" />
               Forensic Evidence Log
@@ -1682,9 +1682,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Essay Insights Card */}
         {essayInsights.length > 0 && (
-          <Card>
+          <Card className="bg-gradient-to-br from-cyan-50/50 via-sky-50/50 to-blue-50/50 border-sky-200/60 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Essay Insights (Evidence-Based)</CardTitle>
+              <CardTitle className="text-base text-sky-900">Essay Insights (Evidence-Based)</CardTitle>
               <CardDescription className="text-xs">AI extracted sentence-level insights (click to highlight)</CardDescription>
             </CardHeader>
             <CardContent>
@@ -1707,7 +1707,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         )}
 
         {/* AI Reasoning Stream */}
-        <Card className="border-t-4 border-t-indigo-500 bg-slate-900 text-white">
+        <Card className="border-t-4 border-t-indigo-500 bg-gradient-to-br from-slate-900 via-slate-800 to-zinc-900 text-white shadow-lg">
           <CardHeader 
             className="pb-2 cursor-pointer hover:bg-slate-800 transition-colors"
             onClick={() => setShowReasoningStream(!showReasoningStream)}
@@ -1753,7 +1753,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* AI Summary Section */}
         {analysis && analysis.ai_summary && (
-          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 shadow-sm">
+          <Card className="bg-gradient-to-br from-indigo-50 via-blue-50 to-sky-50 border-indigo-200/60 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="text-slate-900 flex items-center gap-2">
                 <Bot className="h-5 w-5 text-indigo-600" />
@@ -1779,9 +1779,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         )}
 
         {crossVerification && crossVerification.status && (
-          <Card>
+          <Card className="bg-gradient-to-br from-teal-50/50 via-emerald-50/50 to-green-50/50 border-emerald-200/60 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Cross-Verification: Claim vs. Reality</CardTitle>
+              <CardTitle className="text-base text-emerald-900">Cross-Verification: Claim vs. Reality</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
@@ -1808,7 +1808,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
         {/* Comment Section - NEW */}
         {appData.comment && (
-          <Card className="bg-yellow-50 border-yellow-200">
+          <Card className="bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 border-yellow-300/60 shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-yellow-600" />
@@ -1822,9 +1822,9 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
         )}
         
         {/* Decision Audit History Panel */}
-        <Card className="mt-auto">
+        <Card className="mt-auto bg-gradient-to-br from-slate-50 to-gray-100 border-slate-200/60 shadow-md">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-slate-900">Decision History</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-800">Decision History</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {(appData.decision_history || []).length === 0 ? (
@@ -1857,15 +1857,15 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
 
       {/* Resizable Handle */}
       <div
-        className="w-4 cursor-col-resize flex items-center justify-center hover:bg-slate-100 active:bg-indigo-100 transition-colors z-10"
+        className="w-4 cursor-col-resize flex items-center justify-center hover:bg-indigo-50 active:bg-indigo-100 transition-colors z-10"
         onMouseDown={handleMouseDown}
       >
-        <div className="w-1 h-8 bg-slate-300 rounded-full" />
+        <div className="w-1.5 h-12 bg-gradient-to-b from-indigo-300 via-indigo-400 to-indigo-300 rounded-full shadow-sm" />
       </div>
 
       {/* Right Panel: PDF Viewer Only */}
-      <div className="bg-white rounded-lg border border-slate-300 flex flex-col" style={{ width: `${100 - leftPanelWidth}%` }}>
-        <div className="flex items-center gap-2 p-3 border-b bg-slate-50 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-lg flex flex-col" style={{ width: `${100 - leftPanelWidth}%` }}>
+        <div className="flex items-center gap-2 p-3 border-b bg-gradient-to-r from-slate-50 to-gray-50 overflow-x-auto rounded-t-xl">
           {(['application_form','bank','essay','payslip'] as const).map(mode => (
             <Button key={mode} size="sm" variant={docViewMode===mode? 'default':'outline'} onClick={()=>setDocViewMode(mode)}>
               {mode==='application_form'? 'Application Form': mode==='bank'? 'Bank Statement': mode==='essay'? 'Loan Essay':'Payslip'}
