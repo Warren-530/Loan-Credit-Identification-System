@@ -16,6 +16,36 @@ BASE_SYSTEM_PROMPT = """
 
 ---
 
+### 🔒 DETERMINISTIC SCORING REQUIREMENT (CRITICAL)
+
+**CONSISTENCY IS MANDATORY**
+
+This assessment system MUST produce **IDENTICAL SCORES** for **IDENTICAL DOCUMENTS**.
+
+**RULES FOR DETERMINISTIC SCORING:**
+1. **NO RANDOM FACTORS** - Never use probabilistic language or estimates without clear basis
+2. **FIXED POINT VALUES** - Each condition has ONE fixed point value (use the tables exactly)
+3. **MATHEMATICAL PRECISION** - All calculations must use exact numbers from documents
+4. **BINARY CONDITIONS** - Each scoring condition is either MET or NOT MET (no "maybe")
+5. **NO SUBJECTIVE INTERPRETATION** - Use only the criteria defined in this prompt
+6. **ROUND CONSISTENTLY** - Always round to nearest whole number, round 0.5 UP
+
+**SCORING PROCESS:**
+1. Extract EXACT numbers from documents (income, debts, balances)
+2. Apply formulas EXACTLY as specified (NDI, DSR)
+3. Check each condition in scoring tables - YES or NO
+4. Sum points using the EXACT values in the tables
+5. Apply caps if any kill-switch conditions are met
+6. Final score = Base (50) + sum of all angle adjustments
+
+**Example of DETERMINISTIC scoring:**
+- Income = RM5,000 (from bank statement)
+- DSR = 35% (calculated exactly)
+- DSR 30-40% = +4 points (from table, not "around +4" or "+3 to +5")
+- This MUST always give +4, never +3 or +5
+
+---
+
 ### ⚠️ BALANCED SCORING PHILOSOPHY
 
 **FAIR BUT RIGOROUS ASSESSMENT**
@@ -278,6 +308,43 @@ DSR = (Total Monthly Debt Obligations + New Installment) / Net Monthly Income ×
 - Score 50-64 = Borderline, needs human review for final decision
 - Score 35-49 = Significant concerns, likely rejection unless mitigated
 - Score < 35 = Critical issues, recommend rejection
+
+---
+
+### 🔢 DETERMINISTIC CALCULATION CHECKLIST
+
+**Before finalizing score, verify these calculations are EXACT:**
+
+1. **Extract Numbers (Use EXACTLY what's in the document):**
+   - Net Salary from Bank: RM _______ (exact deposit amount)
+   - Existing Debt from Payslip: RM _______ (exact deduction)
+   - Living Expenses: RM _______ (use fixed table: Single=1500, Couple=2000, Family=2500)
+   - New Loan Installment: RM _______ (calculated from loan amount/tenure)
+
+2. **Calculate NDI (Show your math):**
+   ```
+   NDI = Net Salary - Existing Debt - New Installment - Living Expenses
+   NDI = RM _____ - RM _____ - RM _____ - RM _____ = RM _____
+   ```
+
+3. **Calculate DSR (Show your math):**
+   ```
+   DSR = (Existing Debt + New Installment) / Net Salary × 100
+   DSR = (RM _____ + RM _____) / RM _____ × 100 = _____% 
+   ```
+
+4. **Apply Scoring Table (Use EXACT points from tables):**
+   - NDI falls in range [_____]: Points = _____
+   - DSR falls in range [_____]: Points = _____
+   - Each condition: check table → apply exact points
+
+5. **Sum All Adjustments:**
+   ```
+   Final Score = 50 (base) + [list all adjustments with their exact points]
+   Final Score = 50 + _____ + _____ + _____ = _____
+   ```
+
+**THE SAME NUMBERS → THE SAME CALCULATIONS → THE SAME SCORE**
 
 ---
 

@@ -7,7 +7,7 @@ import time
 from typing import Dict, Any
 import google.generativeai as genai
 from google.api_core import exceptions
-from prompts import build_prompt
+from prompts_optimized import build_prompt
 import pypdfium2 as pdfium
 from PIL import Image
 import io
@@ -62,7 +62,10 @@ class AIEngine:
             model = genai.GenerativeModel(
                 self.model_name,
                 generation_config={
-                    "response_mime_type": "application/json"
+                    "response_mime_type": "application/json",
+                    "temperature": 0.0,  # CRITICAL: Set to 0 for deterministic/consistent outputs
+                    "top_p": 1.0,         # No nucleus sampling randomness
+                    "top_k": 1            # Always pick the most likely token
                 }
             )
             
@@ -370,7 +373,15 @@ class AIEngine:
 
         # 3. Call Gemini with Image + Text
         print(f"[AI ENGINE] Initializing Gemini model: {self.model_name}")
-        model = genai.GenerativeModel(self.model_name)
+        model = genai.GenerativeModel(
+            self.model_name,
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.0,  # CRITICAL: Deterministic outputs
+                "top_p": 1.0,
+                "top_k": 1
+            }
+        )
         
         response = None
         for attempt in range(self.max_retries):
@@ -618,7 +629,7 @@ class AIEngine:
         Yields:
             str: Chunks of JSON response text as they are generated
         """
-        from prompts import build_prompt
+        from prompts_optimized import build_prompt
         
         try:
             print(f"[AI ENGINE STREAMING] Building prompt for {application_id}")
@@ -636,7 +647,10 @@ class AIEngine:
             model = genai.GenerativeModel(
                 self.model_name,
                 generation_config={
-                    "response_mime_type": "application/json"
+                    "response_mime_type": "application/json",
+                    "temperature": 0.0,  # CRITICAL: Deterministic outputs
+                    "top_p": 1.0,
+                    "top_k": 1
                 }
             )
             

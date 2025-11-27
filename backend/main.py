@@ -791,14 +791,15 @@ async def process_application_background(
             print("✓ Using cached result")
             result = cached_result
         elif ai_engine:
-            # 2. Run AI Analysis with Auto-Retry (No DB transaction held)
-            MAX_RETRIES = 3
-            RETRY_DELAY = 2  # seconds
+            # 2. Run AI Analysis with UNLIMITED Retry (No DB transaction held)
+            MAX_RETRIES = 999  # Retry until success
+            RETRY_DELAY = 2  # seconds base delay
+            MAX_DELAY = 60   # max delay cap
             last_error = None
             
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    print(f"⚡ Running AI analysis with Gemini... (Attempt {attempt}/{MAX_RETRIES})")
+                    print(f"⚡ Running AI analysis with Gemini... (Attempt {attempt})")
                     # Pass application_form_text to AI for extraction
                     # CRITICAL: Use run_in_threadpool to prevent blocking the main thread during heavy AI/Image processing
                     result = await run_in_threadpool(
@@ -824,34 +825,21 @@ async def process_application_background(
                     
                 except Exception as e:
                     last_error = e
-                    print(f"❌ AI analysis failed (Attempt {attempt}/{MAX_RETRIES}): {e}")
+                    error_str = str(e).lower()
+                    print(f"❌ AI analysis failed (Attempt {attempt}): {e}")
                     
-                    if attempt < MAX_RETRIES:
-                        # Check if it's a retryable error (rate limit, timeout, network issues)
-                        error_str = str(e).lower()
-                        retryable = any(keyword in error_str for keyword in [
-                            '429', 'rate limit', 'quota', 'timeout', 'connection', 
-                            'network', 'temporary', 'overloaded', 'unavailable', 'retry'
-                        ])
-                        
-                        if retryable:
-                            wait_time = RETRY_DELAY * attempt  # Exponential backoff
-                            print(f"🔄 Retryable error detected. Waiting {wait_time}s before retry...")
-                            await asyncio.sleep(wait_time)
-                            continue
-                        else:
-                            print(f"⚠️ Non-retryable error, stopping retries")
-                            break
-            else:
-                # All retries exhausted
-                print(f"❌ All {MAX_RETRIES} attempts failed")
-                if AI_ONLY_MODE:
-                    print("🚫 AI-ONLY MODE: Refusing to use fallback - marking as FAILED")
-                    raise Exception(f"AI analysis required but failed after {MAX_RETRIES} attempts: {last_error}")
-                else:
-                    print("🔄 Falling back to document-based analysis...")
-                    result = generate_mock_result("Unknown", raw_text, application_id, 50000, bank_text, essay_text, payslip_text, application_form_text)
-                    print("✓ Fallback analysis completed")
+                    # Calculate wait time with exponential backoff, capped at MAX_DELAY
+                    wait_time = min(RETRY_DELAY * (2 ** (attempt - 1)), MAX_DELAY)
+                    
+                    # Longer wait for rate limit errors
+                    if '429' in error_str or 'rate limit' in error_str or 'quota' in error_str:
+                        wait_time = min(wait_time * 2, MAX_DELAY)
+                        print(f"🔄 Rate limit detected. Waiting {wait_time}s before retry...")
+                    else:
+                        print(f"🔄 Retrying in {wait_time}s...")
+                    
+                    await asyncio.sleep(wait_time)
+                    continue
         else:
             if AI_ONLY_MODE:
                 print("🚫 AI-ONLY MODE: No API key configured - refusing to process")
