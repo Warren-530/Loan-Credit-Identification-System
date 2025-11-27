@@ -547,7 +547,68 @@ class AIEngine:
         except Exception as e:
             print(f"[ERROR] Failed to recalculate metrics: {e}")
             # Don't fail the whole process, just keep AI values if calculation fails
+        
+        # Recalculate final_score from score_breakdown (LLMs can't do math reliably)
+        result = self.recalculate_risk_score(result)
             
+        return result
+    
+    def recalculate_risk_score(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recalculate final_score from score_breakdown array.
+        LLMs are notoriously bad at summing numbers while generating text.
+        This ensures mathematical accuracy of the risk score.
+        
+        Base score: 50 points (neutral starting point)
+        """
+        try:
+            risk_analysis = result.get('risk_score_analysis', {})
+            score_breakdown = risk_analysis.get('score_breakdown', [])
+            
+            if not score_breakdown:
+                print("[SCORE CALC] No score_breakdown found, keeping AI final_score")
+                return result
+            
+            # Sum all points from breakdown
+            # Check if breakdown includes base score or not
+            has_base_score = any('base' in item.get('category', '').lower() for item in score_breakdown)
+            
+            calculated_score = 0
+            for item in score_breakdown:
+                points = item.get('points', 0)
+                if isinstance(points, (int, float)):
+                    calculated_score += points
+            
+            # If no base score in breakdown, add 50 (neutral base)
+            if not has_base_score:
+                calculated_score += 50
+            
+            # Clamp to 0-100
+            calculated_score = max(0, min(100, calculated_score))
+            
+            ai_score = risk_analysis.get('final_score', 0)
+            
+            print(f"[SCORE CALC] AI final_score: {ai_score}, Calculated from breakdown: {calculated_score}")
+            
+            # Update with calculated score
+            risk_analysis['final_score'] = int(calculated_score)
+            risk_analysis['ai_original_score'] = ai_score  # Keep AI's attempt for debugging
+            
+            # Update risk_level based on recalculated score
+            if calculated_score >= 70:
+                risk_analysis['risk_level'] = "Low"
+            elif calculated_score >= 50:
+                risk_analysis['risk_level'] = "Medium"
+            else:
+                risk_analysis['risk_level'] = "High"
+            
+            result['risk_score_analysis'] = risk_analysis
+            print(f"[SCORE CALC] Final score set to {calculated_score}, risk_level: {risk_analysis['risk_level']}")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to recalculate risk score: {e}")
+            # Don't fail, keep AI values
+        
         return result
 
     def analyze_application_streaming(self, application_form_text: str, raw_text: str, bank_text: str = "", essay_text: str = "", payslip_text: str = "", application_id: str = "", supporting_docs_texts: list[str] = []):

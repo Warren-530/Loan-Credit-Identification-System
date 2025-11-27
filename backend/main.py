@@ -967,7 +967,6 @@ async def process_application_background(
 
 @app.post("/api/upload")
 async def upload_application(
-    background_tasks: BackgroundTasks,
     application_form: UploadFile = File(...),
     bank_statement: UploadFile = File(...),
     essay: UploadFile = File(...),
@@ -1043,15 +1042,17 @@ async def upload_application(
             session.add(app)
             session.commit()
         
-        # Add background task for AI processing
-        background_tasks.add_task(
-            process_application_background,
-            application_id,
-            str(application_form_path),
-            str(bank_statement_path),
-            str(essay_path),
-            str(payslip_path),
-            supporting_doc_paths
+        # Use asyncio.create_task for truly concurrent background processing
+        # This allows the API to remain responsive while analysis runs
+        asyncio.create_task(
+            process_application_background(
+                application_id,
+                str(application_form_path),
+                str(bank_statement_path),
+                str(essay_path),
+                str(payslip_path),
+                supporting_doc_paths
+            )
         )
         
         return {
@@ -1066,7 +1067,6 @@ async def upload_application(
 
 @app.post("/api/upload/batch")
 async def upload_batch(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
     """Upload batch applications via CSV or ZIP"""
@@ -1102,13 +1102,14 @@ async def upload_batch(
                         session.add(app)
                         session.commit()
                     
-                    # Add background processing
-                    background_tasks.add_task(
-                        process_application_background,
-                        app_id,
-                        row.get('loan_type', 'Personal Loan'),
-                        row.get('bank_statement_path'),
-                        row.get('essay_path')
+                    # Use asyncio.create_task for concurrent background processing
+                    asyncio.create_task(
+                        process_application_background(
+                            app_id,
+                            row.get('loan_type', 'Personal Loan'),
+                            row.get('bank_statement_path'),
+                            row.get('essay_path')
+                        )
                     )
                     processed_count += 1
         
@@ -1228,15 +1229,16 @@ async def upload_batch(
                     session.add(app)
                     session.commit()
                 
-                # Trigger AI Analysis
-                background_tasks.add_task(
-                    process_application_background,
-                    app_id,
-                    form_path,
-                    bank_path,
-                    essay_path,
-                    payslip_path,
-                    [p for p in supp_paths if p] # Pass only valid paths
+                # Use asyncio.create_task for concurrent background processing
+                asyncio.create_task(
+                    process_application_background(
+                        app_id,
+                        form_path,
+                        bank_path,
+                        essay_path,
+                        payslip_path,
+                        [p for p in supp_paths if p] # Pass only valid paths
+                    )
                 )
                 processed_count += 1
             
