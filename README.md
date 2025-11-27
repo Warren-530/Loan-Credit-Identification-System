@@ -1,8 +1,41 @@
-# TrustLens AI - Credit Risk Assessment Platform
+# InsightLoan AI - Credit Risk Assessment Platform
 
 An enterprise-grade AI-powered credit risk assessment platform for Malaysian banks, featuring advanced document analysis, behavioral scoring, and explainable AI.
 
-## 🚀 Features
+## Quick Start (For Forked Projects)
+
+**One-click setup for new users who forked this repository:**
+
+### Windows Users:
+```cmd
+# Double-click or run in terminal:
+QUICK_SETUP.bat
+```
+
+### PowerShell Users:
+```powershell
+# Run in PowerShell:
+.\QUICK_SETUP.ps1
+```
+
+The setup script will:
+1. Check prerequisites (Node.js, Python, npm, pip)
+2. Guide you through API key configuration
+3. Install all dependencies automatically
+4. Build the frontend
+5. Optionally start the application
+
+### Required API Keys:
+
+| Service | Get From | Purpose |
+|---------|----------|---------|
+| **Firebase** | [Firebase Console](https://console.firebase.google.com/) | Authentication & Database |
+| **Gemini AI** | [Google AI Studio](https://aistudio.google.com/app/apikey) | Document Analysis |
+| **SMTP (Optional)** | [Gmail App Password](https://myaccount.google.com/apppasswords) | Email Notifications |
+
+---
+
+## Features
 
 - **Smart Triage Dashboard**: AI-prioritized loan applications with real-time status tracking
 - **360° Risk Console**: Split-screen interface merging AI insights with document evidence
