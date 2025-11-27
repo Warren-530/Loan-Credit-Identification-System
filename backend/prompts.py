@@ -24,13 +24,31 @@ BASE_SYSTEM_PROMPT = """
 - Bank Salary Credit MUST equal Payslip NET Pay (NOT Gross) - within RM50 tolerance (small variance for allowances OK)
 - Address on Application Form should match Bank Statement mailing address (mismatch = potential fraud)
 - If Bank Credit = Gross Salary → FORGED DOCUMENT → INSTANT REJECT
+- **⚠️ IDENTITY MISMATCH = SCORE 0, AUTOMATIC REJECT** - NO EXCEPTIONS
+
+**⚠️ KILL-SWITCH: PAYSLIP vs BANK SALARY VERIFICATION**
+- Extract "Net Pay" from Payslip (after EPF, PCB, SOCSO deductions)
+- Find "Salary Credit" in Bank Statement (look for employer name or "GAJI/SALARY")
+- Calculate variance: `|Payslip Net - Bank Salary| / Payslip Net × 100`
+- If variance > 20%: FLAG as "Income Verification FAILED" and apply -20 points
+- **Common fraud**: Fake payslip showing RM5000 but bank only receives RM3000
+- **Where is the money?** Possible hidden garnishments, fake document, or shadow deductions
 
 **STEP 2: NDI CHECK (Net Disposable Income) - THE KING METRIC**
 Formula: `Verified Income - All Debts - New Installment - Living Expenses = NDI`
 - **AUTO-REJECT Thresholds:**
-  * Single person: NDI < RM500 → REJECT
-  * Family (2+ members): NDI < RM1,000 → REJECT
+  * Single person: NDI < RM500 → REJECT (Score CAPPED at 35)
+  * Family (2+ members): NDI < RM1,000 → REJECT (Score CAPPED at 40)
+  * NDI RM500-800: Score CAPPED at 45 (HIGH RISK)
+  * NDI RM800-1000: Score CAPPED at 55 (REVIEW WITH CAUTION)
+  * **CRITICAL**: This is a HARD CAP - NO bonus can push score above this ceiling
 - A "passable" DSR (50%) is MEANINGLESS if absolute NDI is too low to survive
+- Example: Tan Jia Wen case - DSR 45% looks acceptable, but NDI = RM200 = POVERTY TRAP
+
+**⚠️ KILL-SWITCH: NDI POVERTY TRAP**
+- Do NOT approve based on "decent DSR" alone
+- Always ask: "After paying everything, can this person EAT and PAY RENT?"
+- RM500 NDI = RM16/day = CANNOT SURVIVE IN MALAYSIA
 
 **STEP 3: ESSAY vs REALITY GAP (Optimism Penalty)**
 - Essay = Marketing. Bank Statement = Reality.
@@ -238,6 +256,23 @@ Apply ALL 5 angles systematically:
 
 ### MANDATORY CROSS-DOCUMENT VERIFICATION (MINIMUM 5 COMPARISONS)
 
+**⚠️ FORENSIC CROSS-VERIFICATION PROTOCOL**
+These comparisons are CRITICAL for fraud detection. Do not skip any.
+
+**MANDATORY CHECK #1: PAYSLIP NET vs BANK SALARY**
+- Extract Payslip "Net Pay" amount (after all deductions)
+- Find Bank Statement "Salary Credit" (employer name or "GAJI")
+- Calculate: `Variance = |Net Pay - Bank Salary| / Net Pay × 100%`
+- If Variance < 5%: ✅ VERIFIED
+- If Variance 5-15%: ⚠️ Minor variance (allowances paid separately?)
+- If Variance 15-30%: ❌ SIGNIFICANT MISMATCH - investigate
+- If Variance > 30%: ❌ FRAUD SUSPECTED - Payslip likely fake
+
+**MANDATORY CHECK #2: APPLICATION INCOME vs REALITY**
+- Application Form "Annual Income" ÷ 12 = Claimed Monthly
+- Compare to LOWER of (Payslip Net Pay, Bank Salary Credit)
+- If claimed > 20% higher than verified → Flag "Income Exaggeration"
+
 Generate at least 5 detailed claim-vs-reality comparisons:
 
 1. **Income Claims**: Essay mentions income → verify with Payslip + Bank deposits + Application Form
@@ -273,9 +308,33 @@ Each comparison MUST include:
    - Formula: `((Existing Debt + New Installment) / Net Income) × 100`
    - Assessment: <40% Low | 40-60% Moderate | >60% High Risk
 
-2. **NET DISPOSABLE INCOME (NDI)**
+2. **NET DISPOSABLE INCOME (NDI) - THE KING METRIC**
    - Formula: `Net Income - Total Debt - New Installment - Living Expenses`
-   - Assessment: >RM2000 Sufficient | RM1000-2000 Tight | <RM1000 Critical
+   - **⚠️ THIS IS THE MOST IMPORTANT METRIC - SURVIVAL CHECK**
+   - Assessment: 
+     * >RM2000 = Sufficient buffer, healthy
+     * RM1500-2000 = Adequate, some breathing room
+     * RM1000-1500 = Tight, but survivable
+     * RM800-1000 = Critical, Score CAP 55
+     * RM500-800 = HIGH RISK, Score CAP 45
+     * <RM500 = POVERTY TRAP, Score CAP 35, AUTO-REJECT
+   
+   **⚠️ NDI OVERRIDE EXAMPLE:**
+   ```
+   Applicant: Tan Jia Wen
+   Net Income: RM3,200
+   Existing Debt: RM1,400 (PTPTN + Car)
+   New Loan Installment: RM500
+   Living Expenses: RM1,100
+   ---------------------------------
+   NDI = 3200 - 1400 - 500 - 1100 = RM200
+   
+   DSR = (1400 + 500) / 3200 = 59% (Moderate - looks acceptable!)
+   BUT NDI = RM200 = CANNOT SURVIVE = AUTO-REJECT
+   ```
+   
+   **The DSR trap**: A person with high income but massive debt can have "acceptable" DSR 
+   but ZERO money left to live. Always check ABSOLUTE NDI, not just percentage ratios.
 
 3. **LOAN-TO-VALUE RATIO (LTV)** [Car/Housing only]
    - Formula: `(Loan Amount / Asset Value) × 100`
@@ -294,6 +353,21 @@ Each comparison MUST include:
 
 ### RISK SCORING (0-100 Scale) - MODERATE STRICTNESS
 
+**⚠️ KILL-SWITCH SCORING (Apply BEFORE base score) ⚠️**
+These are NON-NEGOTIABLE score caps that OVERRIDE all other calculations:
+
+| Condition | Score CAP | Decision |
+|-----------|-----------|----------|
+| Identity Mismatch (Name/IC) | 0 | REJECT |
+| Forensic Fraud Detected | ≤ 25 | REJECT |
+| NDI < RM500 (single) | ≤ 35 | REJECT |
+| NDI < RM1000 (family) | ≤ 40 | REJECT |
+| NDI RM500-800 | ≤ 45 | HIGH RISK |
+| NDI RM800-1000 | ≤ 55 | REVIEW |
+| Payslip vs Bank variance >30% | ≤ 45 | HIGH RISK |
+
+**ONLY if all kill-switches PASS, proceed with normal scoring:**
+
 **BASE SCORE: 50 points** (Neutral - applicant must PROVE creditworthiness)
 
 **SCORING PHILOSOPHY:**
@@ -304,7 +378,19 @@ Each comparison MUST include:
 
 Apply adjustments from ALL 5 angles:
 
-**FORENSIC ANGLE (max ±18 points total)**
+**FORENSIC ANGLE (max ±18 points total) - WITH KILL-SWITCHES**
+
+**⚠️ KILL-SWITCH: IDENTITY MISMATCH = SCORE 0**
+Before applying any forensic points, check:
+- Name on Application Form vs Name on Payslip vs Name on Bank Statement
+- IC Number consistency across ALL documents
+- If ANY mismatch → STOP SCORING → SET SCORE = 0 → REJECT
+
+**⚠️ KILL-SWITCH: PAYSLIP vs BANK MISMATCH > 30% = SCORE CAP 45**
+- Compare Payslip Net Pay vs Bank Salary Credit
+- If variance > 30% → CAP SCORE at 45, flag as "Income Verification Failed"
+
+**Normal forensic scoring (only if kill-switches pass):**
 - ✅ Perfect document consistency with strong cross-verification: +8
 - ✅ Documents aligned, minor gaps acceptable: +3
 - ⚠️ Small discrepancy (variance, typo): -4
@@ -319,8 +405,13 @@ Apply adjustments from ALL 5 angles:
 - ❌ DSR > 65%: -14
 - ✅ NDI > RM2500: +8
 - ✅ NDI RM1500-2500: +3
-- ⚠️ NDI RM800-1500: -4
-- ❌ NDI < RM800: -12
+- ⚠️ NDI RM1000-1500: -4
+- ❌ NDI RM800-1000: -8 + Score CAP 55
+- ❌ NDI RM500-800: -12 + Score CAP 45
+- ❌ NDI < RM500: -18 + Score CAP 35 (AUTO-REJECT)
+
+**⚠️ NDI OVERRIDE RULE**: Even if DSR looks good, LOW NDI triggers score cap!
+Example: DSR 40% (good!) but NDI RM300 → Score CAPPED at 35 → REJECT
 
 **BEHAVIORAL ANGLE (max ±18 points total)**
 - ✅ Exceptional savings discipline (>20% income saved): +8
@@ -351,7 +442,17 @@ Apply adjustments from ALL 5 angles:
 - 40-54: Weak applicant (~20%)
 - 0-39: Risky applicant (~10%) → Total Reject ~30%
 
-**FINAL SCORE MAPPING:**
+**FINAL SCORE MAPPING (with Kill-Switch overrides):**
+
+**Kill-Switch Score Caps (Applied FIRST):**
+- Identity Mismatch → Score = 0 → REJECT
+- Forensic Fraud → Score ≤ 25 → REJECT  
+- NDI < RM500 → Score ≤ 35 → REJECT
+- NDI RM500-800 → Score ≤ 45 → HIGH RISK
+- NDI RM800-1000 → Score ≤ 55 → REVIEW
+- Payslip vs Bank >30% variance → Score ≤ 45 → HIGH RISK
+
+**Normal Score Mapping (only if no kill-switch triggered):**
 - 70-100: LOW RISK → APPROVE
 - 50-69: MEDIUM RISK → REVIEW (Human needed)
 - 0-49: HIGH RISK → REJECT
@@ -1067,15 +1168,64 @@ PROMPT_CAR = """
 ### SPECIFIC INSTRUCTION: CAR LOAN (HIRE PURCHASE)
 **Target Profile:** Gig Workers (Grab/Lalamove) or Fresh Grads.
 
+**⚠️ CRITICAL: ASSET vs LIABILITY CLASSIFICATION**
+This is the MOST IMPORTANT factor for Car Loans. A car is either:
+1. **PRODUCTIVE ASSET** (Income-Generating): The car PAYS for itself
+2. **PURE LIABILITY** (Consumption): The car DRAINS resources
+
 **Analysis Logic:**
-1. **Asset vs. Liability Check:**
-   - *Investment:* If user claims to be a Grab Driver, verified by "Grab/Lalamove" payout inflows -> The car generates income. **Boost Score.**
-   - *Consumption:* If no gig income found -> The car is a pure liability. Apply stricter DSR limits.
-2. **Operational Risk:**
-   - Look for "JPJ", "Saman" (Fines), or frequent "Workshop" payments.
-   - Frequent fines indicate reckless behavior -> Higher probability of default or accidents.
-3. **Maintenance Capability:** Does the user have a buffer for road tax/insurance renewal?
-4. **Fuel/Toll Patterns:** High fuel/toll spend without matching gig income suggests high personal usage (Liability).
+
+**1. Asset vs. Liability Check (PRIMARY - max ±16 points):**
+- ✅ **INCOME-GENERATING (+12)**: 
+  - Grab/Lalamove/Maxim payout inflows clearly visible in bank
+  - Calculate: Monthly Gig Income vs Monthly Car Installment
+  - If Gig Income > 1.5x Installment → CAR IS A BUSINESS INVESTMENT
+  - Example: Grab pays RM2400/month, installment RM800 → NET PROFIT RM1600 → BOOST SCORE
+  
+- ✅ **PARTIAL BUSINESS (+6)**: 
+  - Some gig income visible but not consistent
+  - Weekend driver, mixed personal/business use
+  
+- ⚠️ **PERSONAL USE (-4)**: 
+  - No gig income, car for commuting only
+  - This is STANDARD case - not necessarily bad, but apply stricter NDI check
+  
+- ❌ **CONSUMPTION ONLY (-12)**: 
+  - Luxury/performance car clearly beyond applicant's means
+  - Car price > 3x annual income with no business justification
+  - Example: RM150k car on RM4000 salary with no Grab income → RED FLAG
+
+**2. GIG INCOME VERIFICATION (for claimed e-hailing):**
+- Search bank statement for: "GRAB", "LALAMOVE", "MAXIM", "GOJEK", "FOODPANDA RIDER"
+- Calculate average monthly gig income from past 3-6 months
+- Verify consistency: Are payments regular or sporadic?
+- If applicant CLAIMS to be Grab driver but NO Grab income in bank → FLAG "Unverified Business Claim"
+
+**3. Operational Capability (max ±8 points):**
+- ✅ PREPARED (+6): Savings buffer for insurance (~RM1500/year), road tax (~RM500), maintenance
+- ✅ ADEQUATE (+2): Some buffer available
+- ⚠️ MINIMAL (-3): Just enough for installment, no buffer
+- ❌ UNPREPARED (-8): No buffer for running costs = will default on insurance/roadtax
+
+**4. Driving Behavior Risk (max ±6 points):**
+- Check for traffic fines, JPJ summons in bank transactions
+- ✅ CLEAN (+4): No fines visible
+- ⚠️ OCCASIONAL (-2): 1-2 minor fines
+- ❌ FREQUENT (-6): Multiple fines visible → Higher accident/default risk
+
+**5. Fuel & Toll Pattern Analysis (max ±6 points):**
+- For CLAIMED business users: High fuel/toll is EXPECTED and GOOD
+- ✅ BUSINESS PATTERN (+4): High fuel/toll WITH matching Grab/delivery income
+- ⚠️ PERSONAL PATTERN (-2): Moderate fuel/toll, personal use
+- ❌ EXPENSE MISMATCH (-6): Very high fuel/toll WITHOUT income justification
+  - Example: RM800 fuel+toll monthly but NO gig income → WHERE IS THE MONEY GOING?
+
+**6. CAR VALUE vs INCOME REALITY CHECK:**
+- Calculate: Car Price / Annual Net Income = Multiple
+- < 1x = Conservative, safe choice
+- 1-2x = Standard, acceptable
+- 2-3x = Stretched, needs strong income proof
+- > 3x = OVER-LEVERAGED, flag as "Car Beyond Means"
 """
 
 COPILOT_SYSTEM_PROMPT = """
