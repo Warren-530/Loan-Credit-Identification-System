@@ -19,14 +19,12 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
       {/* Logo Section */}
-      <div className="flex h-16 items-center px-6 border-b border-slate-100">
+      <div className="flex h-20 items-center px-6 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <Image 
+          <img 
             src="/logo.png" 
             alt="InsightLoan Logo" 
-            width={36} 
-            height={36}
-            className="h-9 w-9 object-contain"
+            style={{ width: '48px', height: '48px', objectFit: 'contain' }}
           />
           <span className="text-xl font-bold text-slate-900 tracking-tight">InsightLoan</span>
         </div>
