@@ -13,7 +13,7 @@ timeout /t 2 /nobreak >nul
 echo.
 echo Starting Backend Server (Port 8000)...
 cd /d "%~dp0backend"
-start "InsightLoan Backend" cmd /k "venv\Scripts\activate && python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
+start "InsightLoan Backend" cmd /k "python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
 
 timeout /t 3 /nobreak >nul
 

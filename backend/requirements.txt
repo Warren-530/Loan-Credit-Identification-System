@@ -1,13 +1,33 @@
+# InsightLoan Backend Dependencies
+# Python 3.10 or higher required
+# Install with: pip install -r requirements.txt
+
+# Web Framework
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
+starlette>=0.38.0
+
+# Data Validation and Database
 pydantic==2.9.2
 sqlmodel==0.0.22
+
+# PDF Processing
 pymupdf==1.24.13
-chromadb==0.5.18
+pypdfium2==4.30.0
+
+# AI Integration (Google Gemini)
 google-generativeai==0.8.5
-python-dotenv==1.0.1
+
+# Vector Database for RAG
+chromadb==0.5.18
+
+# OCR and Image Processing
 pytesseract==0.3.10
 Pillow==10.4.0
-pypdfium2==4.30.0
+
+# Report Generation
 reportlab==4.4.5
+
+# Configuration
+python-dotenv==1.0.1
