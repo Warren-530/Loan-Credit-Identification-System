@@ -4,10 +4,10 @@ InsightLoan is a credit risk assessment platform built for Malaysian banks. It u
 
 The system processes PDF documents including application forms, bank statements, payslips, and supporting documents. It generates risk scores, identifies potential concerns, and provides recommendations for loan officers.
 
-###Presentation Video:
+Presentation Video:
 https://drive.google.com/file/d/10y8mYIjiezHFYlkQZwxRmKR1ckB6NCVs/view?usp=sharing 
 
-###Presentation Slide:
+Presentation Slide:
 https://www.canva.com/design/DAG5t4CIlao/tMZTWAkvo3lCCKJBqAPkTQ/edit?utm_content=DAG5t4CIlao&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton 
 
 ---
