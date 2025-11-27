@@ -172,11 +172,11 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Average Risk Score */}
+        {/* Average Credit Score */}
         <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Risk Score</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Credit Score</p>
               <div className="h-9 w-9 bg-purple-50 rounded-lg flex items-center justify-center">
                 <Activity className="h-4 w-4 text-purple-600" />
               </div>
@@ -242,10 +242,10 @@ export default function AnalyticsPage() {
 
       {/* Charts - Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
-        {/* Risk Score Distribution */}
+        {/* Credit Score Distribution */}
         <Card className="lg:col-span-2 bg-white border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg font-semibold text-slate-900">Risk Score Distribution</CardTitle>
+            <CardTitle className="text-lg font-semibold text-slate-900">Credit Score Distribution</CardTitle>
             <CardDescription className="text-xs text-slate-500">
               Portfolio credit score breakdown across risk tiers
             </CardDescription>
