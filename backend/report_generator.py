@@ -18,6 +18,23 @@ class ReportGenerator:
     
     def __init__(self, output_dir: str = "./uploads"):
         self.output_dir = output_dir
+        # Create paragraph styles for table cells
+        self.styles = getSampleStyleSheet()
+        self.cell_style = ParagraphStyle(
+            'CellStyle',
+            parent=self.styles['Normal'],
+            fontSize=8,
+            leading=10,
+            alignment=TA_LEFT,
+        )
+        self.cell_style_bold = ParagraphStyle(
+            'CellStyleBold',
+            parent=self.styles['Normal'],
+            fontSize=8,
+            leading=10,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+        )
     
     def generate_decision_report(
         self,
@@ -119,35 +136,44 @@ class ReportGenerator:
             c.drawString(20*mm, y_pos, "Risk Score Calculation Breakdown")
             y_pos -= 5*mm
             
-            # Create table data
-            table_data = [["Category", "Points", "Reason"]]
-            for sb in score_breakdown[:6]:  # Limit to 6 rows to fit page
+            # Create table data with Paragraph for text wrapping
+            header_style = ParagraphStyle('Header', fontSize=8, fontName='Helvetica-Bold', leading=10)
+            cell_style = ParagraphStyle('Cell', fontSize=8, fontName='Helvetica', leading=10)
+            
+            table_data = [[
+                Paragraph("Category", header_style),
+                Paragraph("Points", header_style),
+                Paragraph("Reason", header_style)
+            ]]
+            for sb in score_breakdown[:8]:  # Show up to 8 rows
                 points_str = f"+{sb['points']}" if sb['points'] > 0 else str(sb['points'])
-                reason = sb.get('reason', '')[:60]  # Truncate reason
+                reason = sb.get('reason', '')
                 table_data.append([
-                    sb.get('category', ''),
-                    points_str,
-                    reason
+                    Paragraph(sb.get('category', ''), cell_style),
+                    Paragraph(points_str, cell_style),
+                    Paragraph(reason, cell_style)  # Full text with auto-wrap
                 ])
             
-            # Draw table
-            table = Table(table_data, colWidths=[50*mm, 20*mm, 90*mm])
+            # Draw table with better column widths for text wrapping
+            table = Table(table_data, colWidths=[42*mm, 15*mm, 103*mm])
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.Color(245/255, 245/255, 245/255)),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('GRID', (0, 0), (-1, -1), 0.3, colors.black),
-                ('LINEBELOW', (0, 0), (-1, 0), 1.2, colors.black),
+                ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(250/255, 250/255, 250/255)]),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ]))
             
-            table.wrapOn(c, page_width, page_height)
-            table.drawOn(c, 20*mm, y_pos - len(table_data) * 6*mm)
-            y_pos -= (len(table_data) * 6*mm + 10*mm)
+            # Calculate actual table height
+            table_width, table_height = table.wrap(page_width, page_height)
+            table.drawOn(c, 20*mm, y_pos - table_height)
+            y_pos -= (table_height + 10*mm)
         
         # Risk Flags
         risk_flags = []
@@ -159,32 +185,46 @@ class ReportGenerator:
             c.drawString(20*mm, y_pos, "Key Risk Flags & Findings")
             y_pos -= 5*mm
             
+            # Create table with Paragraph for text wrapping
+            header_style = ParagraphStyle('Header', fontSize=8, fontName='Helvetica-Bold', leading=10)
+            cell_style = ParagraphStyle('Cell', fontSize=8, fontName='Helvetica', leading=10)
+            
+            # Calculate available space for risk flags
+            available_height = y_pos - 25*mm  # Leave margin at bottom
+            
             # Limit flags to fit on page
-            flags_to_show = risk_flags[:4]
-            table_data = [["Risk Flag", "Severity", "Description"]]
+            flags_to_show = risk_flags[:6]  # Show up to 6 flags
+            table_data = [[
+                Paragraph("Risk Flag", header_style),
+                Paragraph("Severity", header_style),
+                Paragraph("Description", header_style)
+            ]]
             for flag in flags_to_show:
+                desc = flag.get('description', '')
                 table_data.append([
-                    flag.get('flag', '')[:40],
-                    flag.get('severity', 'Medium'),
-                    flag.get('description', '')[:60]
+                    Paragraph(flag.get('flag', ''), cell_style),
+                    Paragraph(flag.get('severity', 'Medium'), cell_style),
+                    Paragraph(desc, cell_style)  # Full description with auto-wrap
                 ])
             
-            table = Table(table_data, colWidths=[50*mm, 25*mm, 85*mm])
+            table = Table(table_data, colWidths=[42*mm, 20*mm, 98*mm])
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.Color(245/255, 245/255, 245/255)),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('GRID', (0, 0), (-1, -1), 0.3, colors.black),
-                ('LINEBELOW', (0, 0), (-1, 0), 1.2, colors.black),
+                ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(250/255, 250/255, 250/255)]),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ]))
             
-            table.wrapOn(c, page_width, page_height)
-            table.drawOn(c, 20*mm, y_pos - len(table_data) * 6*mm)
+            # Calculate actual table height
+            table_width, table_height = table.wrap(page_width, page_height)
+            table.drawOn(c, 20*mm, y_pos - table_height)
         
         # Footer
         c.setFont("Helvetica", 9)
