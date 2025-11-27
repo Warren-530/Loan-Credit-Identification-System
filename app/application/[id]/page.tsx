@@ -838,34 +838,36 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
       <div className="flex flex-col space-y-6 overflow-y-auto pr-4 select-text" style={{ width: `${leftPanelWidth}%` }}>
         {/* Enhanced Header with Context Layer */}
         <div className="space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 flex-1 min-w-0">
               {/* Back Button + Name */}
-              <div className="flex items-center gap-3">
-                <Link href="/">
+              <div className="flex items-start gap-3">
+                <Link href="/" className="flex-shrink-0 mt-1">
                   <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-slate-100">
                     <ArrowLeft className="h-5 w-5 text-slate-600" />
                   </Button>
                 </Link>
-                <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
-                
-                {/* Review Status Badge */}
-                {appData.review_status === "Manual_Override" ? (
-                  <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Manual Override
-                  </Badge>
-                ) : appData.review_status === "Human_Verified" ? (
-                  <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    <User className="h-3 w-3 mr-1" />
-                    Verified
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-white text-slate-600 border-slate-300">
-                    <Bot className="h-3 w-3 mr-1" />
-                    AI Analysis
-                  </Badge>
-                )}
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
+                  
+                  {/* Review Status Badge */}
+                  {appData.review_status === "Manual_Override" ? (
+                    <Badge className="bg-purple-50 text-purple-700 border border-purple-200 flex-shrink-0">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Manual Override
+                    </Badge>
+                  ) : appData.review_status === "Human_Verified" ? (
+                    <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 flex-shrink-0">
+                      <User className="h-3 w-3 mr-1" />
+                      Verified
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-white text-slate-600 border-slate-300 flex-shrink-0">
+                      <Bot className="h-3 w-3 mr-1" />
+                      AI Analysis
+                    </Badge>
+                  )}
+                </div>
               </div>
               <p className="text-sm text-slate-500 font-medium ml-12">Application ID: {resolvedParams.id}</p>
               
@@ -1052,7 +1054,7 @@ export default function ApplicationDetail({ params }: { params: Promise<{ id: st
               </Button>
 
               {/* Rapid Review Navigation - Second Row */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-start">
                 <Button 
                   variant="outline" 
                   size="sm"
