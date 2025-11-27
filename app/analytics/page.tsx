@@ -7,11 +7,12 @@ import { Slider } from "@/components/ui/slider"
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend, ScatterChart, Scatter, ReferenceLine, ZAxis, Label,
-  LineChart, Line, Area, AreaChart, ComposedChart
+  LineChart, Line, Area, AreaChart, ComposedChart, FunnelChart, Funnel, LabelList
 } from "recharts"
 import { 
   TrendingUp, TrendingDown, DollarSign, Activity, Clock, 
-  CheckCircle2, AlertTriangle, ShieldAlert, Users, FileCheck, Calendar, Zap
+  CheckCircle2, AlertTriangle, ShieldAlert, Users, FileCheck, Calendar, Zap,
+  Rocket, Target, Filter
 } from "lucide-react"
 
 interface ScatterPoint {
@@ -240,8 +241,275 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
+      {/* Operational Analytics Section */}
+      <div className="pt-6 mt-4 border-t border-slate-200">
+        <h2 className="text-xl font-bold text-slate-900 mb-1">Operational Analytics</h2>
+        <p className="text-sm text-slate-500 mb-6">Processing efficiency and workload insights</p>
+      </div>
+
+      {/* TAT Comparison & Workload Funnel Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* TAT (Turnaround Time) Comparison */}
+        <Card className="bg-white border-slate-200 shadow-sm">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900">Turnaround Time (TAT) Optimization</CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Processing speed comparison: Manual vs AI-assisted review
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={[
+                    { name: 'Manual Review', time: 45, fill: '#4f46e5' },
+                    { name: 'InsightLoan AI', time: 0.5, fill: '#10b981' }
+                  ]}
+                  layout="vertical"
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis 
+                    type="number" 
+                    fontSize={11} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tick={{ fill: '#64748b' }}
+                    unit=" min"
+                  />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tick={{ fill: '#475569', fontWeight: 500 }}
+                    width={120}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9', opacity: 0.3 }}
+                    contentStyle={{ 
+                      borderRadius: '8px', 
+                      border: 'none', 
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value: number) => [`${value} minutes`, 'Processing Time']}
+                  />
+                  <Bar 
+                    dataKey="time" 
+                    radius={[0, 8, 8, 0]}
+                    maxBarSize={50}
+                  >
+                    <Cell fill="#4f46e5" />
+                    <Cell fill="#10b981" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-3">
+              <Rocket className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">98% Faster Processing</p>
+                <p className="text-xs text-emerald-700">AI reduces average processing time from 45 mins to 30 seconds</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Workload Funnel */}
+        <Card className="bg-white border-slate-200 shadow-sm">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900">Workload Funnel</CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Application processing pipeline and automation distribution
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {(() => {
+              const total = data.kpi.total_applications || 100
+              const autoProcessed = Math.round(total * 0.7)
+              const pendingReview = total - autoProcessed
+              
+              const funnelData = [
+                { name: 'Total Received', value: total, fill: '#4f46e5', percentage: '100%' },
+                { name: 'Auto-Processed', value: autoProcessed, fill: '#10b981', percentage: '70%' },
+                { name: 'Pending Human Review', value: pendingReview, fill: '#f59e0b', percentage: '30%' }
+              ]
+              
+              return (
+                <>
+                  <div className="space-y-4">
+                    {funnelData.map((item, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate-700">{item.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900">{item.value}</span>
+                            <Badge variant="outline" className="text-xs font-semibold" style={{ borderColor: item.fill, color: item.fill }}>
+                              {item.percentage}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="h-10 bg-slate-100 rounded-lg overflow-hidden relative">
+                          <div 
+                            className="h-full rounded-lg transition-all duration-500 flex items-center justify-end pr-3"
+                            style={{ 
+                              width: `${(item.value / total) * 100}%`, 
+                              backgroundColor: item.fill,
+                              minWidth: '60px'
+                            }}
+                          >
+                            <span className="text-white text-xs font-semibold">{item.value}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-emerald-700">70%</p>
+                      <p className="text-xs text-emerald-600 font-medium">Fully Automated</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-amber-700">30%</p>
+                      <p className="text-xs text-amber-600 font-medium">Needs Review</p>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Rejection Reasons Pareto Chart */}
+      <Card className="bg-white border-slate-200 shadow-sm mt-6">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <CardTitle className="text-lg font-semibold text-slate-900">Risk Factor Frequency (Pareto Analysis)</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Top reasons for flagged applications - focus on high-impact factors for maximum improvement
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {(() => {
+            // Use actual top_risk_flags data or fallback to sample data
+            const riskData = data.charts.top_risk_flags.length > 0 
+              ? data.charts.top_risk_flags.map((flag, idx) => ({
+                  reason: flag.name,
+                  count: flag.count,
+                  percentage: Math.round((flag.count / data.kpi.total_applications) * 100)
+                }))
+              : [
+                  { reason: 'High DSR (>60%)', count: 40, percentage: 40 },
+                  { reason: 'Income Mismatch', count: 25, percentage: 25 },
+                  { reason: 'Gambling Transactions', count: 15, percentage: 15 },
+                  { reason: 'Low Savings Buffer', count: 10, percentage: 10 },
+                  { reason: 'Other Factors', count: 10, percentage: 10 }
+                ]
+            
+            // Calculate cumulative percentage for Pareto line
+            let cumulative = 0
+            const paretoData = riskData.map(item => {
+              cumulative += item.percentage
+              return { ...item, cumulative }
+            })
+            
+            const PARETO_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16']
+            
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={paretoData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="reason" 
+                        fontSize={10} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tick={{ fill: '#64748b' }}
+                        angle={-15}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis 
+                        yAxisId="left"
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tick={{ fill: '#64748b' }}
+                        label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748b' } }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        fontSize={11} 
+                        tickLine={false} 
+                        axisLine={false}
+                        tick={{ fill: '#64748b' }}
+                        domain={[0, 100]}
+                        label={{ value: 'Cumulative %', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: '#64748b' } }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: '8px', 
+                          border: 'none', 
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          fontSize: '12px'
+                        }}
+                      />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="count" 
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={60}
+                        name="Occurrences"
+                      >
+                        {paretoData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={PARETO_COLORS[index % PARETO_COLORS.length]} />
+                        ))}
+                      </Bar>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="cumulative" 
+                        stroke="#4f46e5" 
+                        strokeWidth={3}
+                        dot={{ fill: '#4f46e5', r: 5 }}
+                        name="Cumulative %"
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-4">Factor Breakdown</h4>
+                  {paretoData.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: PARETO_COLORS[idx % PARETO_COLORS.length] }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-700 truncate">{item.reason}</p>
+                        <p className="text-xs text-slate-500">{item.percentage}% of cases</p>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">{item.count}</span>
+                    </div>
+                  ))}
+                  <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p className="text-xs text-indigo-800">
+                      <strong>80/20 Rule:</strong> Top 2-3 factors typically account for 80% of all flagged applications
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Charts - Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         {/* Credit Score Distribution */}
         <Card className="lg:col-span-2 bg-white border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-100 pb-4">
